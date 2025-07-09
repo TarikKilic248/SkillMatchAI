@@ -6,7 +6,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import {
   AlertDialog,
@@ -19,24 +18,24 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {
-  BookOpen,
-  Clock,
-  Target,
-  Brain,
-  TrendingUp,
-  Play,
-  CheckCircle,
-  Circle,
-  RotateCcw,
-  ArrowRight,
-  ArrowLeft,
-  Sparkles,
-  Zap,
-  Award,
-  Users,
-  Calendar,
-  BookMarked,
-} from "lucide-react"
+  FiBookOpen,
+  FiClock,
+  FiTarget,
+  FiTrendingUp,
+  FiPlay,
+  FiCheckCircle,
+  FiCircle,
+  FiRotateCcw,
+  FiArrowRight,
+  FiArrowLeft,
+  FiStar,
+  FiZap,
+  FiAward,
+  FiUsers,
+  FiCalendar,
+  FiBookmark,
+} from "react-icons/fi"
+import { FaBrain } from "react-icons/fa"
 
 interface UserData {
   learningGoal: string
@@ -104,7 +103,7 @@ export default function MicroLearningPlatform() {
       field: "learningGoal" as keyof UserData,
       type: "input",
       placeholder: "Örnek: Frontend geliştirme uzmanı olmak",
-      icon: Target,
+      icon: FiTarget,
       gradient: "from-purple-500 to-pink-500",
     },
     {
@@ -113,12 +112,12 @@ export default function MicroLearningPlatform() {
       field: "dailyTime" as keyof UserData,
       type: "select",
       options: [
-        { value: "30min", label: "⏰ 30 dakika", desc: "Kısa ve etkili" },
-        { value: "1hour", label: "🕐 1 saat", desc: "Dengeli tempo" },
-        { value: "2hours", label: "🕑 2 saat", desc: "Yoğun öğrenme" },
-        { value: "3hours", label: "🕒 3+ saat", desc: "Maksimum verim" },
+        { value: "30min", label: "30 dakika", desc: "Kısa ve etkili" },
+        { value: "1hour", label: "1 saat", desc: "Dengeli tempo" },
+        { value: "2hours", label: "2 saat", desc: "Yoğun öğrenme" },
+        { value: "3hours", label: "3+ saat", desc: "Maksimum verim" },
       ],
-      icon: Clock,
+      icon: FiClock,
       gradient: "from-blue-500 to-cyan-500",
     },
     {
@@ -127,12 +126,12 @@ export default function MicroLearningPlatform() {
       field: "duration" as keyof UserData,
       type: "select",
       options: [
-        { value: "2weeks", label: "🚀 2 hafta", desc: "Hızlı başlangıç" },
-        { value: "4weeks", label: "📈 4 hafta", desc: "Optimal süre" },
-        { value: "8weeks", label: "🎯 8 hafta", desc: "Derinlemesine" },
-        { value: "12weeks", label: "🏆 12 hafta", desc: "Uzman seviye" },
+        { value: "2weeks", label: "2 hafta", desc: "Hızlı başlangıç" },
+        { value: "4weeks", label: "4 hafta", desc: "Optimal süre" },
+        { value: "8weeks", label: "8 hafta", desc: "Derinlemesine" },
+        { value: "12weeks", label: "12 hafta", desc: "Uzman seviye" },
       ],
-      icon: Calendar,
+      icon: FiCalendar,
       gradient: "from-green-500 to-emerald-500",
     },
     {
@@ -141,12 +140,12 @@ export default function MicroLearningPlatform() {
       field: "learningStyle" as keyof UserData,
       type: "select",
       options: [
-        { value: "visual", label: "👁️ Görsel öğrenme", desc: "Videolar ve grafikler" },
-        { value: "practical", label: "🛠️ Uygulamalı öğrenme", desc: "Projeler ve pratik" },
-        { value: "reading", label: "📚 Okuyarak öğrenme", desc: "Makaleler ve kitaplar" },
-        { value: "mixed", label: "🎭 Karma öğrenme", desc: "Her türlü içerik" },
+        { value: "visual", label: "Görsel öğrenme", desc: "Videolar ve grafikler" },
+        { value: "practical", label: "Uygulamalı öğrenme", desc: "Projeler ve pratik" },
+        { value: "reading", label: "Okuyarak öğrenme", desc: "Makaleler ve kitaplar" },
+        { value: "mixed", label: "Karma öğrenme", desc: "Her türlü içerik" },
       ],
-      icon: Brain,
+      icon: FaBrain,
       gradient: "from-orange-500 to-red-500",
     },
     {
@@ -155,12 +154,12 @@ export default function MicroLearningPlatform() {
       field: "targetLevel" as keyof UserData,
       type: "select",
       options: [
-        { value: "beginner", label: "🌱 Başlangıç", desc: "Temelden başla" },
-        { value: "intermediate", label: "🌿 Orta seviye", desc: "Bilgini geliştir" },
-        { value: "advanced", label: "🌳 İleri seviye", desc: "Uzmanlaş" },
-        { value: "expert", label: "🏅 Uzman seviye", desc: "Lider ol" },
+        { value: "beginner", label: "Başlangıç", desc: "Temelden başla" },
+        { value: "intermediate", label: "Orta seviye", desc: "Bilgini geliştir" },
+        { value: "advanced", label: "İleri seviye", desc: "Uzmanlaş" },
+        { value: "expert", label: "Uzman seviye", desc: "Lider ol" },
       ],
-      icon: TrendingUp,
+      icon: FiTrendingUp,
       gradient: "from-indigo-500 to-purple-500",
     },
   ]
@@ -172,10 +171,12 @@ export default function MicroLearningPlatform() {
 
     try {
       const steps = [
-        { text: "✨ Senin için program oluşturuyoruz...", progress: 20 },
-        { text: "🤖 Gemini bağlantısı kuruluyor...", progress: 40 },
-        { text: "🎯 Program oluşturuluyor...", progress: 70 },
-        { text: "🎨 Son dokunuşlar yapılıyor...", progress: 90 },
+        { text: "Senin için program oluşturuyoruz...", progress: 15 },
+        { text: "Gemini bağlantısı kuruluyor...", progress: 30 },
+        { text: "Öğrenme hedeflerin analiz ediliyor...", progress: 45 },
+        { text: "Kişiselleştirilmiş modüller hazırlanıyor...", progress: 60 },
+        { text: "İçerik yapısı oluşturuluyor...", progress: 75 },
+        { text: "Son kontroller yapılıyor...", progress: 90 },
       ]
 
       let stepIndex = 0
@@ -185,7 +186,7 @@ export default function MicroLearningPlatform() {
           setLoadingProgress(steps[stepIndex].progress)
           stepIndex++
         }
-      }, 1000)
+      }, 800)
 
       const response = await fetch("/api/generate-plan", {
         method: "POST",
@@ -202,7 +203,7 @@ export default function MicroLearningPlatform() {
       const planData = await response.json()
       clearInterval(loadingInterval)
 
-      setLoadingText("🎉 Tamamlandı!")
+      setLoadingText("Tamamlandı!")
       setLoadingProgress(100)
 
       await new Promise((resolve) => setTimeout(resolve, 500))
@@ -211,7 +212,7 @@ export default function MicroLearningPlatform() {
       setCurrentScreen("dashboard")
     } catch (error) {
       console.error("Error generating plan:", error)
-      setLoadingText("⚠️ Hata oluştu, varsayılan plan yükleniyor...")
+      setLoadingText("Hata oluştu, varsayılan plan yükleniyor...")
 
       await new Promise((resolve) => setTimeout(resolve, 1000))
 
@@ -223,7 +224,7 @@ export default function MicroLearningPlatform() {
             title: "Temel Kavramlar",
             description: "Konuya giriş ve temel kavramların öğrenilmesi",
             objectives: ["Temel kavramları anlama", "Terminolojiyi öğrenme"],
-            resources: ["📹 Video: Giriş dersi", "📄 Makale: Temel kavramlar"],
+            resources: ["Video: Giriş dersi", "Makale: Temel kavramlar"],
             quiz: {
               question: "Bu modülde öğrendiğin en önemli kavram neydi?",
               type: "open",
@@ -238,7 +239,7 @@ export default function MicroLearningPlatform() {
             title: "Pratik Uygulamalar",
             description: "Öğrenilen kavramların pratikte uygulanması",
             objectives: ["Pratik beceriler kazanma", "Uygulama geliştirme"],
-            resources: ["💻 Interaktif uygulama", "📝 Kod örnekleri"],
+            resources: ["Interaktif uygulama", "Kod örnekleri"],
             quiz: {
               question: "Hangi uygulama türü daha faydalı oldu?",
               options: ["Interaktif uygulamalar", "Kod örnekleri", "Video dersler", "Okuma materyalleri"],
@@ -343,13 +344,23 @@ export default function MicroLearningPlatform() {
         }
       }
 
-      const updatedModules = learningPlan.modules.map((m) => {
+      // Create sequential order for proper unlocking
+      const sequentialModules = [...learningPlan.modules].sort((a, b) => {
+        const getNumericId = (id: string) => {
+          const match = id.match(/\d+/)
+          return match ? Number.parseInt(match[0]) : 0
+        }
+        return getNumericId(a.id) - getNumericId(b.id)
+      })
+
+      const updatedModules = sequentialModules.map((m) => {
         if (m.id === currentModule.id) {
           return { ...m, completed: true }
         }
         return m
       })
 
+      // Find current module index in sequential order and unlock next
       const currentIndex = updatedModules.findIndex((m) => m.id === currentModule.id)
       if (currentIndex < updatedModules.length - 1) {
         updatedModules[currentIndex + 1].unlocked = true
@@ -366,7 +377,7 @@ export default function MicroLearningPlatform() {
     setShowRegenerateDialog(false)
     setCurrentScreen("loading")
     setLoadingProgress(0)
-    setLoadingText("🔄 Geri bildirimleriniz analiz ediliyor...")
+    setLoadingText("Geri bildirimleriniz analiz ediliyor...")
 
     try {
       const completedModuleIds = learningPlan?.modules.filter((m) => m.completed).map((m) => m.id) || []
@@ -388,10 +399,10 @@ export default function MicroLearningPlatform() {
       }
 
       const steps = [
-        { text: "🔍 Geri bildirimleriniz analiz ediliyor...", progress: 25 },
-        { text: "🤖 Gemini ile plan optimize ediliyor...", progress: 50 },
-        { text: "🎯 Yeni modüller oluşturuluyor...", progress: 75 },
-        { text: "✨ Plan hazırlanıyor...", progress: 100 },
+        { text: "Geri bildirimleriniz analiz ediliyor...", progress: 25 },
+        { text: "Gemini ile plan optimize ediliyor...", progress: 50 },
+        { text: "Yeni modüller oluşturuluyor...", progress: 75 },
+        { text: "Plan hazırlanıyor...", progress: 100 },
       ]
 
       for (const step of steps) {
@@ -406,23 +417,23 @@ export default function MicroLearningPlatform() {
       setCurrentScreen("dashboard")
     } catch (error) {
       console.error("Plan yeniden oluşturulurken hata:", error)
-      setLoadingText("⚠️ Hata oluştu, önceki plan geri yükleniyor...")
+      setLoadingText("Hata oluştu, önceki plan geri yükleniyor...")
       await new Promise((resolve) => setTimeout(resolve, 1000))
       setCurrentScreen("dashboard")
     }
   }
 
   const getModuleIcon = (type: string, completed: boolean, unlocked: boolean) => {
-    if (completed) return <CheckCircle className="w-6 h-6 text-emerald-400" />
-    if (!unlocked) return <Circle className="w-6 h-6 text-slate-400" />
+    if (completed) return <FiCheckCircle className="w-6 h-6 text-emerald-400" />
+    if (!unlocked) return <FiCircle className="w-6 h-6 text-slate-400" />
 
     switch (type) {
       case "quiz":
-        return <Brain className="w-6 h-6 text-violet-400" />
+        return <FaBrain className="w-6 h-6 text-violet-400" />
       case "exam":
-        return <Award className="w-6 h-6 text-amber-400" />
+        return <FiAward className="w-6 h-6 text-amber-400" />
       default:
-        return <BookOpen className="w-6 h-6 text-sky-400" />
+        return <FiBookOpen className="w-6 h-6 text-sky-400" />
     }
   }
 
@@ -442,7 +453,7 @@ export default function MicroLearningPlatform() {
 
   if (currentScreen === "welcome") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-violet-600 via-purple-600 to-pink-600 flex items-center justify-center p-4 overflow-hidden relative">
+      <div className="min-h-screen bg-gradient-to-br from-violet-600 via-purple-600 to-pink-600 flex items-center justify-center p-4 overflow-hidden relative font-inter">
         {/* Animated background elements */}
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute -top-40 -right-40 w-80 h-80 bg-white/10 rounded-full blur-3xl animate-pulse"></div>
@@ -454,7 +465,7 @@ export default function MicroLearningPlatform() {
           <CardContent className="p-10 text-center">
             <div className="mb-8">
               <div className="relative mb-6">
-                <Sparkles className="w-20 h-20 mx-auto text-yellow-300 animate-bounce" />
+                <FiStar className="w-20 h-20 mx-auto text-yellow-300 animate-bounce" />
                 <div className="absolute inset-0 w-20 h-20 mx-auto bg-yellow-300/20 rounded-full blur-xl animate-pulse"></div>
               </div>
               <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-white to-yellow-200 bg-clip-text text-transparent">
@@ -467,15 +478,15 @@ export default function MicroLearningPlatform() {
 
             <div className="space-y-4 mb-8">
               <div className="flex items-center justify-center space-x-2 text-white/70">
-                <Zap className="w-5 h-5 text-yellow-400" />
+                <FiZap className="w-5 h-5 text-yellow-400" />
                 <span>AI destekli kişiselleştirme</span>
               </div>
               <div className="flex items-center justify-center space-x-2 text-white/70">
-                <Target className="w-5 h-5 text-green-400" />
+                <FiTarget className="w-5 h-5 text-green-400" />
                 <span>Hedef odaklı modüller</span>
               </div>
               <div className="flex items-center justify-center space-x-2 text-white/70">
-                <Users className="w-5 h-5 text-blue-400" />
+                <FiUsers className="w-5 h-5 text-blue-400" />
                 <span>İnteraktif öğrenme deneyimi</span>
               </div>
             </div>
@@ -486,7 +497,7 @@ export default function MicroLearningPlatform() {
               size="lg"
             >
               Başlayalım
-              <ArrowRight className="w-5 h-5 ml-2" />
+              <FiArrowRight className="w-5 h-5 ml-2" />
             </Button>
           </CardContent>
         </Card>
@@ -500,7 +511,7 @@ export default function MicroLearningPlatform() {
 
     return (
       <div
-        className={`min-h-screen bg-gradient-to-br ${currentQ.gradient} flex items-center justify-center p-4 overflow-hidden relative`}
+        className={`min-h-screen bg-gradient-to-br ${currentQ.gradient} flex items-center justify-center p-4 overflow-hidden relative font-inter`}
       >
         {/* Animated background */}
         <div className="absolute inset-0 overflow-hidden">
@@ -518,10 +529,9 @@ export default function MicroLearningPlatform() {
                 {currentQuestion + 1} / {questions.length}
               </span>
             </div>
-            <div className="relative">
-              <Progress value={((currentQuestion + 1) / questions.length) * 100} className="h-3 bg-white/20" />
+            <div className="relative bg-white/20 rounded-full h-3 overflow-hidden">
               <div
-                className="absolute inset-0 bg-gradient-to-r from-white/40 to-white/60 rounded-full h-3 transition-all duration-500"
+                className="absolute inset-0 bg-gradient-to-r from-white/60 to-white/80 rounded-full h-3 transition-all duration-500 ease-out"
                 style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }}
               ></div>
             </div>
@@ -539,7 +549,9 @@ export default function MicroLearningPlatform() {
             <CardContent className="p-8">
               <div className="text-center mb-8">
                 <div className="relative mb-6">
-                  <div className={`w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br ${currentQ.gradient} p-4 shadow-lg`}>
+                  <div
+                    className={`w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br ${currentQ.gradient} p-4 shadow-lg transition-all duration-300`}
+                  >
                     <IconComponent className="w-8 h-8 text-white" />
                   </div>
                   <div className="absolute inset-0 w-16 h-16 mx-auto bg-white/20 rounded-2xl blur-xl"></div>
@@ -593,7 +605,7 @@ export default function MicroLearningPlatform() {
                   variant="outline"
                   className="bg-white/10 border-white/20 text-white hover:bg-white/20 px-6 py-3 rounded-xl transition-all duration-300 disabled:opacity-50"
                 >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  <FiArrowLeft className="w-4 h-4 mr-2" />
                   Geri
                 </Button>
                 <Button
@@ -603,13 +615,13 @@ export default function MicroLearningPlatform() {
                 >
                   {currentQuestion === questions.length - 1 ? (
                     <>
-                      <Sparkles className="w-4 h-4 mr-2" />
+                      <FiStar className="w-4 h-4 mr-2" />
                       Planı Oluştur
                     </>
                   ) : (
                     <>
                       İleri
-                      <ArrowRight className="w-4 h-4 ml-2" />
+                      <FiArrowRight className="w-4 h-4 ml-2" />
                     </>
                   )}
                 </Button>
@@ -623,7 +635,7 @@ export default function MicroLearningPlatform() {
 
   if (currentScreen === "loading") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center p-4 overflow-hidden relative">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center p-4 overflow-hidden relative font-inter">
         {/* Animated background */}
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-white/10 rounded-full blur-3xl animate-pulse"></div>
@@ -641,29 +653,13 @@ export default function MicroLearningPlatform() {
               <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-white to-yellow-200 bg-clip-text text-transparent">
                 {loadingText}
               </h2>
-              <div className="relative">
-                <Progress value={loadingProgress} className="h-3 bg-white/20" />
+              <div className="relative bg-white/20 rounded-full h-4 overflow-hidden">
                 <div
-                  className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full h-3 transition-all duration-1000"
+                  className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full h-4 transition-all duration-1000 ease-out"
                   style={{ width: `${loadingProgress}%` }}
                 ></div>
               </div>
               <p className="text-white/60 text-sm mt-3 font-medium">{loadingProgress}%</p>
-            </div>
-
-            <div className="space-y-3 text-white/70 text-sm">
-              <div className="flex items-center justify-center space-x-2">
-                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-                <span>AI analiz yapıyor</span>
-              </div>
-              <div className="flex items-center justify-center space-x-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse delay-300"></div>
-                <span>Kişisel plan oluşturuluyor</span>
-              </div>
-              <div className="flex items-center justify-center space-x-2">
-                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse delay-700"></div>
-                <span>Modüller hazırlanıyor</span>
-              </div>
             </div>
           </CardContent>
         </Card>
@@ -676,154 +672,254 @@ export default function MicroLearningPlatform() {
     const totalCount = learningPlan.modules.length
     const progressPercentage = (completedCount / totalCount) * 100
 
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-400 via-cyan-500 to-blue-600 p-4 overflow-hidden relative">
-        {/* Animated background */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute top-10 left-10 w-32 h-32 bg-white/10 rounded-full blur-2xl animate-float"></div>
-          <div className="absolute bottom-10 right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl animate-float-delayed"></div>
-          <div className="absolute top-1/2 left-1/4 w-24 h-24 bg-white/10 rounded-full blur-xl animate-float-slow"></div>
-        </div>
+    // Create sequential order - ensure proper progression
+    const sequentialModules = [...learningPlan.modules].sort((a, b) => {
+      // Extract numeric part from id for proper ordering
+      const getNumericId = (id: string) => {
+        const match = id.match(/\d+/)
+        return match ? Number.parseInt(match[0]) : 0
+      }
+      return getNumericId(a.id) - getNumericId(b.id)
+    })
 
-        <div className="max-w-6xl mx-auto relative z-10">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-white mb-4 bg-gradient-to-r from-white to-cyan-200 bg-clip-text text-transparent">
-              {learningPlan.title}
-            </h1>
+    // Find current active module (first unlocked but not completed)
+    const currentActiveModule = sequentialModules.find((m) => m.unlocked && !m.completed)
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-400 via-cyan-500 to-blue-600 font-inter">
+        {/* Fixed Header */}
+        <div className="sticky top-0 z-50 bg-white/10 backdrop-blur-xl border-b border-white/20">
+          <div className="max-w-4xl mx-auto p-6">
+            <div className="text-center mb-6">
+              <h1 className="text-3xl font-bold text-white mb-4 bg-gradient-to-r from-white to-cyan-200 bg-clip-text text-transparent">
+                {learningPlan.title}
+              </h1>
+            </div>
 
             {/* Progress Stats */}
-            <div className="flex justify-center items-center space-x-8 mb-6">
-              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20">
+            <div className="flex justify-center items-center space-x-6 mb-4">
+              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20 text-center">
                 <div className="text-2xl font-bold text-white">{completedCount}</div>
                 <div className="text-white/70 text-sm">Tamamlanan</div>
               </div>
-              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20">
+              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20 text-center">
                 <div className="text-2xl font-bold text-white">{totalCount - completedCount}</div>
                 <div className="text-white/70 text-sm">Kalan</div>
               </div>
-              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20">
+              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20 text-center">
                 <div className="text-2xl font-bold text-white">{Math.round(progressPercentage)}%</div>
                 <div className="text-white/70 text-sm">İlerleme</div>
               </div>
             </div>
 
-            <Button
-              onClick={() => setShowRegenerateDialog(true)}
-              variant="outline"
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20 px-6 py-3 rounded-xl transition-all duration-300 transform hover:scale-105"
-            >
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Planı Yeniden Oluştur
-            </Button>
-          </div>
-
-          {/* Learning Tree */}
-          <div className="relative h-[500px] bg-white/5 rounded-3xl backdrop-blur-sm border border-white/10 overflow-hidden shadow-2xl">
-            <svg className="absolute inset-0 w-full h-full">
-              {/* Tree connections with enhanced styling */}
-              {learningPlan.modules.map((module, index) => {
-                if (index < learningPlan.modules.length - 1) {
-                  const nextModule = learningPlan.modules[index + 1]
-                  return (
-                    <line
-                      key={`line-${module.id}`}
-                      x1={`${module.position.x}%`}
-                      y1={`${module.position.y}%`}
-                      x2={`${nextModule.position.x}%`}
-                      y2={`${nextModule.position.y}%`}
-                      stroke={module.completed ? "rgba(16, 185, 129, 0.6)" : "rgba(255,255,255,0.3)"}
-                      strokeWidth="3"
-                      strokeDasharray={module.completed ? "0" : "8,4"}
-                      className="transition-all duration-500"
-                    />
-                  )
-                }
-                return null
-              })}
-            </svg>
-
-            {/* Enhanced Modules */}
-            {learningPlan.modules.map((module) => (
-              <div
-                key={module.id}
-                className={`absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all duration-500 ${
-                  module.unlocked ? "hover:scale-110 hover:-translate-y-2" : "opacity-60"
-                }`}
-                style={{ left: `${module.position.x}%`, top: `${module.position.y}%` }}
-                onClick={() => handleModuleClick(module)}
-              >
-                <div className="relative group">
-                  <div
-                    className={`w-20 h-20 rounded-2xl flex items-center justify-center bg-gradient-to-br ${getModuleGradient(module.type, module.completed, module.unlocked)} backdrop-blur-sm border-2 border-white/30 shadow-xl transition-all duration-300 ${
-                      module.unlocked ? "group-hover:shadow-2xl group-hover:border-white/50" : ""
-                    }`}
-                  >
-                    {getModuleIcon(module.type, module.completed, module.unlocked)}
-                  </div>
-
-                  {/* Glow effect */}
-                  <div
-                    className={`absolute inset-0 w-20 h-20 rounded-2xl bg-gradient-to-br ${getModuleGradient(module.type, module.completed, module.unlocked)} opacity-20 blur-xl transition-all duration-300 ${
-                      module.unlocked ? "group-hover:opacity-40" : ""
-                    }`}
-                  ></div>
-
-                  {/* Completion indicator */}
-                  {module.completed && (
-                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-white shadow-lg">
-                      <CheckCircle className="w-3 h-3 text-white" />
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-3 text-center">
-                  <p className="text-white text-sm font-semibold max-w-24 truncate">{module.title}</p>
-                  <Badge
-                    variant="secondary"
-                    className={`text-xs mt-1 px-2 py-1 rounded-full ${
-                      module.type === "quiz"
-                        ? "bg-violet-500/20 text-violet-200 border border-violet-400/30"
-                        : module.type === "exam"
-                          ? "bg-amber-500/20 text-amber-200 border border-amber-400/30"
-                          : "bg-sky-500/20 text-sky-200 border border-sky-400/30"
-                    }`}
-                  >
-                    {module.type === "quiz" ? "🧠 Quiz" : module.type === "exam" ? "🏆 Sınav" : "📚 Ders"}
-                  </Badge>
-                </div>
+            {/* Overall Progress Bar */}
+            <div className="max-w-md mx-auto mb-4">
+              <div className="relative bg-white/20 rounded-full h-3 overflow-hidden">
+                <div
+                  className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-full h-3 transition-all duration-1000 ease-out"
+                  style={{ width: `${progressPercentage}%` }}
+                ></div>
               </div>
-            ))}
+            </div>
+
+            <div className="flex justify-center">
+              <Button
+                onClick={() => setShowRegenerateDialog(true)}
+                variant="outline"
+                className="bg-white/10 border-white/20 text-white hover:bg-white/20 px-6 py-3 rounded-xl transition-all duration-300 transform hover:scale-105"
+              >
+                <FiRotateCcw className="w-4 h-4 mr-2" />
+                Planı Yeniden Oluştur
+              </Button>
+            </div>
           </div>
         </div>
 
-        <AlertDialog open={showRegenerateDialog} onOpenChange={setShowRegenerateDialog}>
-          <AlertDialogContent className="bg-white/95 backdrop-blur-xl border-white/20">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-slate-800">Planı Yeniden Oluştur</AlertDialogTitle>
-              <AlertDialogDescription className="text-slate-600">
-                Bu işlem mevcut ilerlemenizi silecek ve yeni bir plan oluşturacak. Devam etmek istediğinizden emin
-                misiniz?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel className="bg-slate-100 hover:bg-slate-200 text-slate-800">İptal</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={regeneratePlan}
-                className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white"
-              >
-                Evet, Yeniden Oluştur
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {/* Scrollable Content */}
+        <div className="max-w-4xl mx-auto p-6 pb-20">
+          {/* Learning Path Header */}
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-white mb-2">Öğrenme Yolculuğun</h2>
+            <p className="text-white/80">Sırayla ilerleyerek hedefine ulaş</p>
+          </div>
+
+          {/* Sequential Course Path */}
+          <div className="relative">
+            {/* Progress Line */}
+            <div className="absolute left-8 top-8 bottom-8 w-1 bg-gradient-to-b from-white/30 via-white/20 to-white/10 rounded-full"></div>
+
+            {/* Completed Progress Line */}
+            <div
+              className="absolute left-8 top-8 w-1 bg-gradient-to-b from-emerald-400 to-cyan-400 rounded-full transition-all duration-1000 ease-out"
+              style={{
+                height: `${(completedCount / totalCount) * 100}%`,
+                maxHeight: "calc(100% - 4rem)",
+              }}
+            ></div>
+
+            <div className="space-y-6">
+              {sequentialModules.map((module, index) => {
+                const isActive = currentActiveModule?.id === module.id
+                const isLocked = !module.unlocked
+                const isCompleted = module.completed
+
+                return (
+                  <div
+                    key={module.id}
+                    className={`relative transition-all duration-500 ${
+                      module.unlocked ? "hover:scale-[1.02] cursor-pointer" : ""
+                    }`}
+                    onClick={() => handleModuleClick(module)}
+                  >
+                    {/* Connection Node */}
+                    <div className="absolute left-6 top-6 z-10">
+                      <div
+                        className={`w-6 h-6 rounded-full border-4 transition-all duration-500 ${
+                          isCompleted
+                            ? "bg-emerald-400 border-emerald-300 shadow-lg shadow-emerald-400/50"
+                            : isActive
+                              ? "bg-cyan-400 border-cyan-300 shadow-lg shadow-cyan-400/50 animate-pulse"
+                              : isLocked
+                                ? "bg-slate-400 border-slate-300"
+                                : "bg-white/50 border-white/70"
+                        }`}
+                      >
+                        {isCompleted && <FiCheckCircle className="w-4 h-4 text-white absolute -top-0.5 -left-0.5" />}
+                      </div>
+                    </div>
+
+                    <Card
+                      className={`ml-16 transition-all duration-300 ${
+                        isCompleted
+                          ? "bg-emerald-500/10 border-emerald-400/30 shadow-lg shadow-emerald-400/10"
+                          : isActive
+                            ? "bg-cyan-500/10 border-cyan-400/30 shadow-lg shadow-cyan-400/20 ring-2 ring-cyan-400/30"
+                            : isLocked
+                              ? "bg-slate-500/10 border-slate-400/20 opacity-60"
+                              : "bg-white/10 border-white/20"
+                      } backdrop-blur-xl hover:shadow-2xl`}
+                    >
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-4 flex-1">
+                            {/* Module Icon */}
+                            <div className="relative">
+                              <div
+                                className={`w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br ${getModuleGradient(module.type, module.completed, module.unlocked)} backdrop-blur-sm border-2 border-white/30 shadow-lg transition-all duration-300`}
+                              >
+                                {getModuleIcon(module.type, module.completed, module.unlocked)}
+                              </div>
+                            </div>
+
+                            {/* Module Content */}
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-3 mb-2">
+                                <h3
+                                  className={`text-xl font-semibold ${
+                                    isCompleted ? "text-emerald-100" : isActive ? "text-cyan-100" : "text-white"
+                                  }`}
+                                >
+                                  {module.title}
+                                </h3>
+                                <Badge
+                                  variant="secondary"
+                                  className={`text-xs px-3 py-1 rounded-full ${
+                                    module.type === "quiz"
+                                      ? "bg-violet-500/20 text-violet-200 border border-violet-400/30"
+                                      : module.type === "exam"
+                                        ? "bg-amber-500/20 text-amber-200 border border-amber-400/30"
+                                        : "bg-sky-500/20 text-sky-200 border border-sky-400/30"
+                                  }`}
+                                >
+                                  {module.type === "quiz" ? "Quiz" : module.type === "exam" ? "Sınav" : "Ders"}
+                                </Badge>
+                              </div>
+                              <p
+                                className={`text-sm leading-relaxed ${
+                                  isCompleted ? "text-emerald-200/80" : isActive ? "text-cyan-200/80" : "text-white/80"
+                                }`}
+                              >
+                                {module.description}
+                              </p>
+
+                              {/* Status Indicators */}
+                              <div className="mt-3 flex items-center space-x-4">
+                                {isCompleted && (
+                                  <div className="flex items-center space-x-2">
+                                    <FiCheckCircle className="w-4 h-4 text-emerald-400" />
+                                    <span className="text-emerald-400 text-sm font-medium">Tamamlandı</span>
+                                  </div>
+                                )}
+                                {isActive && (
+                                  <div className="flex items-center space-x-2">
+                                    <FiPlay className="w-4 h-4 text-cyan-400" />
+                                    <span className="text-cyan-400 text-sm font-medium">Şimdi başla</span>
+                                  </div>
+                                )}
+                                {isLocked && (
+                                  <div className="flex items-center space-x-2">
+                                    <FiCircle className="w-4 h-4 text-slate-400" />
+                                    <span className="text-slate-400 text-sm font-medium">Kilitli</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Action Indicator */}
+                          <div className="ml-4">
+                            {module.unlocked && (
+                              <FiArrowRight
+                                className={`w-6 h-6 transition-all duration-300 ${
+                                  isCompleted ? "text-emerald-400" : isActive ? "text-cyan-400" : "text-white/60"
+                                }`}
+                              />
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Module Progress for Active Module */}
+                        {isActive && (
+                          <div className="mt-4 pt-4 border-t border-cyan-400/20">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-cyan-200">Başlamaya hazır</span>
+                              <div className="flex items-center space-x-2">
+                                <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></div>
+                                <span className="text-cyan-300 font-medium">Devam et</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Completion Message */}
+          {completedCount === totalCount && (
+            <div className="mt-12 text-center">
+              <Card className="bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 backdrop-blur-xl border-emerald-400/30 shadow-2xl">
+                <CardContent className="p-8">
+                  <FiAward className="w-16 h-16 mx-auto text-yellow-400 mb-4" />
+                  <h3 className="text-2xl font-bold text-white mb-2">Tebrikler! 🎉</h3>
+                  <p className="text-white/80 text-lg">
+                    Tüm modülleri başarıyla tamamladın. Öğrenme yolculuğun harika geçti!
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
       </div>
     )
   }
 
   if (currentScreen === "module" && currentModule) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-rose-400 via-pink-500 to-purple-600 p-4 overflow-hidden relative">
+      <div className="min-h-screen bg-gradient-to-br from-rose-400 via-pink-500 to-purple-600 p-4 overflow-hidden relative font-inter">
         {/* Animated background */}
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute top-20 left-20 w-40 h-40 bg-white/10 rounded-full blur-3xl animate-pulse"></div>
@@ -853,13 +949,13 @@ export default function MicroLearningPlatform() {
                 {/* Objectives */}
                 <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
                   <h3 className="text-xl font-semibold mb-4 flex items-center">
-                    <Target className="w-5 h-5 mr-2 text-green-400" />
+                    <FiTarget className="w-5 h-5 mr-2 text-green-400" />
                     Hedef Kazanımlar
                   </h3>
                   <ul className="space-y-3">
                     {currentModule.objectives.map((objective, index) => (
                       <li key={index} className="flex items-start">
-                        <CheckCircle className="w-5 h-5 mr-3 text-emerald-400 flex-shrink-0 mt-0.5" />
+                        <FiCheckCircle className="w-5 h-5 mr-3 text-emerald-400 flex-shrink-0 mt-0.5" />
                         <span className="text-white/90">{objective}</span>
                       </li>
                     ))}
@@ -870,13 +966,13 @@ export default function MicroLearningPlatform() {
                 {currentModule.resources.length > 0 && (
                   <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
                     <h3 className="text-xl font-semibold mb-4 flex items-center">
-                      <BookMarked className="w-5 h-5 mr-2 text-blue-400" />
+                      <FiBookmark className="w-5 h-5 mr-2 text-blue-400" />
                       Kaynaklar
                     </h3>
                     <ul className="space-y-3">
                       {currentModule.resources.map((resource, index) => (
                         <li key={index} className="flex items-start">
-                          <Play className="w-5 h-5 mr-3 text-sky-400 flex-shrink-0 mt-0.5" />
+                          <FiPlay className="w-5 h-5 mr-3 text-sky-400 flex-shrink-0 mt-0.5" />
                           <span className="text-white/90">{resource}</span>
                         </li>
                       ))}
@@ -888,7 +984,7 @@ export default function MicroLearningPlatform() {
               {/* Assessment */}
               <div className="bg-white/5 rounded-2xl p-8 border border-white/10 mb-8">
                 <h3 className="text-xl font-semibold mb-6 flex items-center">
-                  <Brain className="w-5 h-5 mr-2 text-violet-400" />
+                  <FaBrain className="w-5 h-5 mr-2 text-violet-400" />
                   Değerlendirme
                 </h3>
                 <div className="bg-white/5 rounded-xl p-6">
@@ -928,14 +1024,14 @@ export default function MicroLearningPlatform() {
                   variant="outline"
                   className="bg-white/10 border-white/20 text-white hover:bg-white/20 px-8 py-4 rounded-xl transition-all duration-300 transform hover:scale-105"
                 >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  <FiArrowLeft className="w-4 h-4 mr-2" />
                   Geri Dön
                 </Button>
                 <Button
                   onClick={completeModule}
                   className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white px-8 py-4 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
                 >
-                  <CheckCircle className="w-4 h-4 mr-2" />
+                  <FiCheckCircle className="w-4 h-4 mr-2" />
                   Tamamla
                 </Button>
               </div>
@@ -946,5 +1042,25 @@ export default function MicroLearningPlatform() {
     )
   }
 
-  return null
+  return (
+    <AlertDialog open={showRegenerateDialog} onOpenChange={setShowRegenerateDialog}>
+      <AlertDialogContent className="bg-white/95 backdrop-blur-xl border-white/20">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-slate-800">Planı Yeniden Oluştur</AlertDialogTitle>
+          <AlertDialogDescription className="text-slate-600">
+            Bu işlem mevcut ilerlemenizi silecek ve yeni bir plan oluşturacak. Devam etmek istediğinizden emin misiniz?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel className="bg-slate-100 hover:bg-slate-200 text-slate-800">İptal</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={regeneratePlan}
+            className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white"
+          >
+            Evet, Yeniden Oluştur
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
 }
