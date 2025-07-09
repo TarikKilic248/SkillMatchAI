@@ -141,7 +141,7 @@ importers:
         specifier: latest
         version: 7.60.0(react@19.0.0)
       react-icons:
-        specifier: latest
+        specifier: ^5.5.0
         version: 5.5.0(react@19.0.0)
       react-resizable-panels:
         specifier: latest

@@ -1,30 +1,30 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { generateText } from "ai"
-import { google } from "@ai-sdk/google"
+import { type NextRequest, NextResponse } from "next/server";
+import { generateText } from "ai";
+import { google } from "@ai-sdk/google";
 
 interface UserData {
-  learningGoal: string
-  dailyTime: string
-  duration: string
-  learningStyle: string
-  targetLevel: string
+  learningGoal: string;
+  dailyTime: string;
+  duration: string;
+  learningStyle: string;
+  targetLevel: string;
 }
 
 interface Module {
-  id: string
-  title: string
-  description: string
-  objectives: string[]
-  resources: string[]
+  id: string;
+  title: string;
+  description: string;
+  objectives: string[];
+  resources: string[];
   quiz: {
-    question: string
-    options?: string[]
-    type: "multiple" | "open"
-  }
-  completed: boolean
-  unlocked: boolean
-  position: { x: number; y: number }
-  type: "lesson" | "quiz" | "exam"
+    question: string;
+    options?: string[];
+    type: "multiple" | "open";
+  };
+  completed: boolean;
+  unlocked: boolean;
+  position: { x: number; y: number };
+  type: "lesson" | "quiz" | "exam";
 }
 
 // Advanced JSON cleaning and repair function
@@ -35,17 +35,17 @@ function repairAndParseJSON(text: string) {
       .replace(/```json\s*/g, "")
       .replace(/```\s*/g, "")
       .replace(/^\s*[\w\s]*?(?=\{)/g, "") // Remove any text before first {
-      .trim()
+      .trim();
 
     // Step 2: Extract JSON content
-    const firstBrace = cleaned.indexOf("{")
-    const lastBrace = cleaned.lastIndexOf("}")
+    const firstBrace = cleaned.indexOf("{");
+    const lastBrace = cleaned.lastIndexOf("}");
 
     if (firstBrace === -1 || lastBrace === -1 || firstBrace >= lastBrace) {
-      throw new Error("No valid JSON structure found")
+      throw new Error("No valid JSON structure found");
     }
 
-    cleaned = cleaned.substring(firstBrace, lastBrace + 1)
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
 
     // Step 3: Fix common JSON issues
     cleaned = cleaned
@@ -61,13 +61,13 @@ function repairAndParseJSON(text: string) {
       // Fix quotes
       .replace(/'/g, '"')
       // Remove any trailing text after the last }
-      .replace(/}\s*[^}]*$/, "}")
+      .replace(/}\s*[^}]*$/, "}");
 
     // Step 4: Try to parse
     try {
-      return JSON.parse(cleaned)
+      return JSON.parse(cleaned);
     } catch (parseError) {
-      console.log("First parse failed, attempting repair...")
+      console.log("First parse failed, attempting repair...");
 
       // Step 5: More aggressive repairs
       cleaned = cleaned
@@ -78,23 +78,29 @@ function repairAndParseJSON(text: string) {
         // Fix boolean and null values
         .replace(/:\s*"(true|false|null)"/g, ": $1")
         // Fix number values that got quoted
-        .replace(/:\s*"(\d+)"/g, ": $1")
+        .replace(/:\s*"(\d+)"/g, ": $1");
 
-      return JSON.parse(cleaned)
+      return JSON.parse(cleaned);
     }
   } catch (error) {
-    console.error("JSON repair failed:", error)
-    console.error("Problematic text:", text.substring(0, 500))
-    throw new Error("Could not repair JSON")
+    console.error("JSON repair failed:", error);
+    console.error("Problematic text:", text.substring(0, 500));
+    throw new Error("Could not repair JSON");
   }
 }
 
 // Create a comprehensive fallback plan
 function createFallbackPlan(userData: UserData) {
   const moduleCount =
-    userData.duration === "2weeks" ? 4 : userData.duration === "4weeks" ? 6 : userData.duration === "8weeks" ? 8 : 10
+    userData.duration === "2weeks"
+      ? 4
+      : userData.duration === "4weeks"
+      ? 6
+      : userData.duration === "8weeks"
+      ? 8
+      : 10;
 
-  const modules = []
+  const modules = [];
 
   // Create modules based on learning goal and style
   const baseTopics = [
@@ -106,26 +112,35 @@ function createFallbackPlan(userData: UserData) {
     "Gerçek Dünya Örnekleri",
     "Performans ve Optimizasyon",
     "Gelecek Adımlar",
-  ]
+  ];
 
   for (let i = 0; i < moduleCount; i++) {
-    const isQuiz = (i + 1) % 3 === 0 && i < moduleCount - 1
-    const isExam = i === moduleCount - 1
-    const topicIndex = Math.min(i, baseTopics.length - 1)
+    const isQuiz = (i + 1) % 3 === 0 && i < moduleCount - 1;
+    const isExam = i === moduleCount - 1;
+    const topicIndex = Math.min(i, baseTopics.length - 1);
 
     modules.push({
       id: `${i + 1}`,
-      title: isExam ? "Final Değerlendirme" : isQuiz ? `Hafta ${Math.ceil((i + 1) / 3)} Quiz` : baseTopics[topicIndex],
+      title: isExam
+        ? "Final Değerlendirme"
+        : isQuiz
+        ? `Hafta ${Math.ceil((i + 1) / 3)} Quiz`
+        : baseTopics[topicIndex],
       description: isExam
         ? "Tüm öğrenilenlerin kapsamlı değerlendirmesi"
         : isQuiz
-          ? "Haftalık değerlendirme ve gözden geçirme"
-          : `${userData.learningGoal} konusunda ${baseTopics[topicIndex].toLowerCase()}`,
+        ? "Haftalık değerlendirme ve gözden geçirme"
+        : `${userData.learningGoal} konusunda ${baseTopics[
+            topicIndex
+          ].toLowerCase()}`,
       objectives: isExam
         ? ["Genel değerlendirme", "Başarı ölçümü"]
         : isQuiz
-          ? ["Haftalık değerlendirme", "Eksik konuları belirleme"]
-          : [`${baseTopics[topicIndex]} konusunda uzmanlaşma`, "Pratik beceriler kazanma"],
+        ? ["Haftalık değerlendirme", "Eksik konuları belirleme"]
+        : [
+            `${baseTopics[topicIndex]} konusunda uzmanlaşma`,
+            "Pratik beceriler kazanma",
+          ],
       resources:
         isExam || isQuiz
           ? []
@@ -133,10 +148,10 @@ function createFallbackPlan(userData: UserData) {
               userData.learningStyle === "visual"
                 ? "Video dersler ve infografikler"
                 : userData.learningStyle === "practical"
-                  ? "Hands-on projeler ve uygulamalar"
-                  : userData.learningStyle === "reading"
-                    ? "Detaylı dökümanlar ve makaleler"
-                    : "Karma öğrenme materyalleri",
+                ? "Hands-on projeler ve uygulamalar"
+                : userData.learningStyle === "reading"
+                ? "Detaylı dökümanlar ve makaleler"
+                : "Karma öğrenme materyalleri",
               "Interaktif alıştırmalar",
               "Gerçek dünya örnekleri",
             ],
@@ -144,38 +159,50 @@ function createFallbackPlan(userData: UserData) {
         question: isExam
           ? "Bu eğitimi genel olarak nasıl değerlendiriyorsun?"
           : isQuiz
-            ? "Bu haftaki konularda hangi alanda daha fazla çalışmaya ihtiyaç duyuyorsun?"
-            : "Bu modülde öğrendiğin en önemli konu neydi?",
+          ? "Bu haftaki konularda hangi alanda daha fazla çalışmaya ihtiyaç duyuyorsun?"
+          : "Bu modülde öğrendiğin en önemli konu neydi?",
         ...(isExam
           ? {
               options: ["Mükemmel", "Çok iyi", "İyi", "Geliştirilmeli"],
               type: "multiple" as const,
             }
           : isQuiz
-            ? {
-                options: ["Temel kavramlar", "Pratik uygulamalar", "İleri konular", "Hepsi iyi"],
-                type: "multiple" as const,
-              }
-            : {
-                type: "open" as const,
-              }),
+          ? {
+              options: [
+                "Temel kavramlar",
+                "Pratik uygulamalar",
+                "İleri konular",
+                "Hepsi iyi",
+              ],
+              type: "multiple" as const,
+            }
+          : {
+              type: "open" as const,
+            }),
       },
       completed: false,
       unlocked: i === 0,
-      position: { x: 50, y: Math.max(10, 90 - (i * 80) / Math.max(1, moduleCount - 1)) },
-      type: isExam ? ("exam" as const) : isQuiz ? ("quiz" as const) : ("lesson" as const),
-    })
+      position: {
+        x: 50,
+        y: Math.max(10, 90 - (i * 80) / Math.max(1, moduleCount - 1)),
+      },
+      type: isExam
+        ? ("exam" as const)
+        : isQuiz
+        ? ("quiz" as const)
+        : ("lesson" as const),
+    });
   }
 
   return {
     title: `${userData.learningGoal} - Kişiselleştirilmiş Öğrenme Planı`,
     modules,
-  }
+  };
 }
 
 // Simplified Gemini call with better error handling
 async function callGeminiSafely(prompt: string) {
-  const models = ["gemini-1.5-flash", "gemini-1.0-pro"]
+  const models = ["gemini-1.5-flash", "gemini-1.0-pro"];
 
   for (const model of models) {
     try {
@@ -183,43 +210,49 @@ async function callGeminiSafely(prompt: string) {
         model: google(model),
         prompt,
         maxTokens: 2000,
-        temperature: 0.1, // Very low temperature for consistent JSON
-      })
+        temperature: 0.3,
+      });
 
       if (!text || text.length < 100) {
-        throw new Error("Response too short")
+        throw new Error("Response too short");
       }
 
-      return text
+      return text;
     } catch (error) {
-      console.error(`Model ${model} failed:`, error)
-      continue
+      console.error(`Model ${model} failed:`, error);
+      continue;
     }
   }
 
-  throw new Error("All models failed")
+  throw new Error("All models failed");
 }
 
 export async function POST(request: NextRequest) {
-  let userData: UserData
+  let userData: UserData;
 
   try {
-    userData = await request.json()
+    userData = await request.json();
 
     // Validate user data
     if (!userData.learningGoal || !userData.dailyTime || !userData.duration) {
-      throw new Error("Missing required user data")
+      throw new Error("Missing required user data");
     }
 
     // Check API key and use fallback if missing
     if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-      console.log("No API key found, using fallback plan")
-      const fallbackPlan = createFallbackPlan(userData)
-      return NextResponse.json(fallbackPlan)
+      console.log("No API key found, using fallback plan");
+      const fallbackPlan = createFallbackPlan(userData);
+      return NextResponse.json(fallbackPlan);
     }
 
     const moduleCount =
-      userData.duration === "2weeks" ? 5 : userData.duration === "4weeks" ? 7 : userData.duration === "8weeks" ? 10 : 12
+      userData.duration === "2weeks"
+        ? 5
+        : userData.duration === "4weeks"
+        ? 7
+        : userData.duration === "8weeks"
+        ? 10
+        : 12;
 
     // Very simple and structured prompt to minimize JSON errors
     const prompt = `Create a learning plan for: ${userData.learningGoal}
@@ -251,33 +284,38 @@ Return ONLY this exact JSON structure with NO additional text:
   ]
 }
 
-Make every 3rd module type "quiz" and last module type "exam". Include exactly ${moduleCount} modules.`
+Make every 3rd module type "quiz" and last module type "exam". Include exactly ${moduleCount} modules.`;
 
-    let planData
+    let planData;
 
     try {
       // Try Gemini first
-      const response = await callGeminiSafely(prompt)
-      planData = repairAndParseJSON(response)
+      const response = await callGeminiSafely(prompt);
+      planData = repairAndParseJSON(response);
 
       // Validate the structure
-      if (!planData || !planData.title || !Array.isArray(planData.modules) || planData.modules.length === 0) {
-        throw new Error("Invalid plan structure from Gemini")
+      if (
+        !planData ||
+        !planData.title ||
+        !Array.isArray(planData.modules) ||
+        planData.modules.length === 0
+      ) {
+        throw new Error("Invalid plan structure from Gemini");
       }
 
       // Validate each module has required fields
       for (let i = 0; i < planData.modules.length; i++) {
-        const module = planData.modules[i]
+        const module = planData.modules[i];
         if (!module.title || !module.description) {
-          throw new Error(`Module ${i + 1} missing required fields`)
+          throw new Error(`Module ${i + 1} missing required fields`);
         }
 
         // Ensure arrays exist
         if (!Array.isArray(module.objectives)) {
-          module.objectives = ["Öğrenme hedefi"]
+          module.objectives = ["Öğrenme hedefi"];
         }
         if (!Array.isArray(module.resources)) {
-          module.resources = ["Öğrenme materyali"]
+          module.resources = ["Öğrenme materyali"];
         }
 
         // Ensure quiz exists
@@ -285,64 +323,72 @@ Make every 3rd module type "quiz" and last module type "exam". Include exactly $
           module.quiz = {
             question: "Bu modülde ne öğrendin?",
             type: "open",
-          }
+          };
         }
       }
 
-      console.log("Successfully parsed Gemini response")
+      console.log("Successfully parsed Gemini response");
     } catch (error) {
-      console.error("Gemini failed, using fallback:", error)
-      planData = createFallbackPlan(userData)
+      console.error("Gemini failed, using fallback:", error);
+      planData = createFallbackPlan(userData);
     }
 
     // Enhance modules with required fields
-    const enhancedModules: Module[] = planData.modules.map((module: any, index: number) => {
-      const totalModules = planData.modules.length
+    const enhancedModules: Module[] = planData.modules.map(
+      (module: any, index: number) => {
+        const totalModules = planData.modules.length;
 
-      return {
-        id: `${index + 1}`,
-        title: module.title || `Modül ${index + 1}`,
-        description: module.description || `${userData.learningGoal} ile ilgili öğrenme modülü`,
-        objectives:
-          Array.isArray(module.objectives) && module.objectives.length > 0
-            ? module.objectives
-            : [`${userData.learningGoal} becerilerini geliştirme`],
-        resources:
-          Array.isArray(module.resources) && module.resources.length > 0
-            ? module.resources
-            : ["Öğrenme materyalleri", "Pratik alıştırmalar"],
-        quiz: {
-          question: module.quiz?.question || "Bu modülde öğrendiklerinizi değerlendiriniz",
-          ...(module.quiz?.options && Array.isArray(module.quiz.options) ? { options: module.quiz.options } : {}),
-          type: module.quiz?.type === "multiple" ? "multiple" : "open",
-        },
-        completed: false,
-        unlocked: index === 0,
-        position: {
-          x: 50,
-          y: Math.max(10, 90 - (index * 80) / Math.max(1, totalModules - 1)),
-        },
-        type:
-          module.type === "exam"
-            ? "exam"
-            : module.type === "quiz"
+        return {
+          id: `${index + 1}`,
+          title: module.title || `Modül ${index + 1}`,
+          description:
+            module.description ||
+            `${userData.learningGoal} ile ilgili öğrenme modülü`,
+          objectives:
+            Array.isArray(module.objectives) && module.objectives.length > 0
+              ? module.objectives
+              : [`${userData.learningGoal} becerilerini geliştirme`],
+          resources:
+            Array.isArray(module.resources) && module.resources.length > 0
+              ? module.resources
+              : ["Öğrenme materyalleri", "Pratik alıştırmalar"],
+          quiz: {
+            question:
+              module.quiz?.question ||
+              "Bu modülde öğrendiklerinizi değerlendiriniz",
+            ...(module.quiz?.options && Array.isArray(module.quiz.options)
+              ? { options: module.quiz.options }
+              : {}),
+            type: module.quiz?.type === "multiple" ? "multiple" : "open",
+          },
+          completed: false,
+          unlocked: index === 0,
+          position: {
+            x: 50,
+            y: Math.max(10, 90 - (index * 80) / Math.max(1, totalModules - 1)),
+          },
+          type:
+            module.type === "exam"
+              ? "exam"
+              : module.type === "quiz"
               ? "quiz"
               : index === totalModules - 1
-                ? "exam"
-                : (index + 1) % 3 === 0
-                  ? "quiz"
-                  : "lesson",
+              ? "exam"
+              : (index + 1) % 3 === 0
+              ? "quiz"
+              : "lesson",
+        };
       }
-    })
+    );
 
     const finalPlan = {
       title: planData.title || `${userData.learningGoal} - Öğrenme Planı`,
       modules: enhancedModules,
-    }
+    };
 
-    return NextResponse.json(finalPlan)
+    return NextResponse.json(finalPlan);
   } catch (error) {
-    console.error("Complete API failure:", error)
+    console.error("Complete API failure:", error);
 
     // Emergency fallback - always return a working plan
     const emergencyPlan = createFallbackPlan(
@@ -352,9 +398,9 @@ Make every 3rd module type "quiz" and last module type "exam". Include exactly $
         duration: "4weeks",
         learningStyle: "mixed",
         targetLevel: "intermediate",
-      },
-    )
+      }
+    );
 
-    return NextResponse.json(emergencyPlan)
+    return NextResponse.json(emergencyPlan);
   }
 }
