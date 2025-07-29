@@ -53,11 +53,29 @@ export default function LoginPage() {
     return allErrors
   }
 
+  const checkUserExists = async (email: string) => {
+    try {
+      // Kullanıcının profiles tablosunda olup olmadığını kontrol et
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("id, email")
+        .eq("email", email.trim().toLowerCase())
+        .single()
+
+      console.log("Profile check result:", { profile, error })
+
+      return !!profile
+    } catch (error) {
+      console.error("User existence check error:", error)
+      return false
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     // Rate limiting kontrolü
-    const clientIP = "user-login" // Gerçek uygulamada IP adresi kullanılabilir
+    const clientIP = "user-login"
     if (!checkRateLimit(clientIP, 5, 15 * 60 * 1000)) {
       const remainingTime = Math.ceil(getRemainingTime(clientIP) / 1000 / 60)
       setErrors([`Çok fazla deneme yaptınız. ${remainingTime} dakika sonra tekrar deneyin.`])
@@ -74,17 +92,31 @@ export default function LoginPage() {
     setErrors([])
 
     try {
+      console.log("Giriş işlemi başlatılıyor...")
+
+      // Önce kullanıcının var olup olmadığını kontrol et
+      const userExists = await checkUserExists(formData.email)
+
+      if (!userExists) {
+        setErrors(["Bu e-posta adresi ile kayıtlı bir kullanıcı bulunamadı. Lütfen kayıt olun."])
+        return
+      }
+
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
       })
+
+      console.log("Auth Response:", { authData, authError })
 
       if (authError) {
         console.error("Login error:", authError)
         if (authError.message.includes("Invalid login credentials")) {
           setErrors(["E-posta veya şifre hatalı"])
         } else if (authError.message.includes("Email not confirmed")) {
-          setErrors(["E-posta adresinizi doğrulamanız gerekiyor"])
+          setErrors(["E-posta adresinizi doğrulamanız gerekiyor. E-posta kutunuzu kontrol edin."])
+        } else if (authError.message.includes("Too many requests")) {
+          setErrors(["Çok fazla deneme yaptınız. Lütfen daha sonra tekrar deneyin."])
         } else {
           setErrors(["Giriş yapılırken bir hata oluştu: " + authError.message])
         }
@@ -92,6 +124,7 @@ export default function LoginPage() {
       }
 
       if (authData.user) {
+        console.log("Giriş başarılı:", authData.user.id)
         setSuccess(true)
         setTimeout(() => {
           router.push("/")

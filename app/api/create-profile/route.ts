@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
+import { supabaseAdmin } from "@/lib/supabase-admin"
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,32 +25,45 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    // Check if profile already exists
-    const { data: existingProfile } = await supabase.from("profiles").select("id").eq("id", user.id).single()
+    console.log("Creating profile for user:", user.id, "with data:", { fullName, email })
 
-    if (existingProfile) {
-      return NextResponse.json({ message: "Profile already exists" })
-    }
-
-    // Create profile
-    const { data: profile, error: profileError } = await supabase
+    // Admin client kullanarak profile oluştur (RLS bypass)
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
-      .insert({
-        id: user.id,
-        full_name: fullName.trim(),
-        email: email.trim().toLowerCase(),
-      })
+      .upsert(
+        {
+          id: user.id,
+          full_name: fullName.trim(),
+          email: email.trim().toLowerCase(),
+        },
+        {
+          onConflict: "id",
+        },
+      )
       .select()
       .single()
 
     if (profileError) {
       console.error("Profile creation error:", profileError)
-      return NextResponse.json({ error: "Failed to create profile" }, { status: 500 })
+      return NextResponse.json(
+        {
+          error: "Failed to create profile",
+          details: profileError.message,
+        },
+        { status: 500 },
+      )
     }
 
-    return NextResponse.json({ profile })
+    console.log("Profile created successfully:", profile)
+    return NextResponse.json({ profile, success: true })
   } catch (error) {
     console.error("Create profile error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        details: (error as Error).message,
+      },
+      { status: 500 },
+    )
   }
 }

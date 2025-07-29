@@ -15,9 +15,11 @@ import { supabase } from "@/lib/supabase"
 import { validateFullName, validateEmail, validatePassword, validatePasswordConfirmation } from "@/lib/validation"
 import { checkRateLimit, getRemainingTime } from "@/lib/rate-limit"
 
-// Add this helper function before the component
+// Profile oluşturma fonksiyonu
 const createProfileViaAPI = async (fullName: string, email: string, session: any) => {
   try {
+    console.log("API ile profile oluşturuluyor:", { fullName, email, sessionExists: !!session })
+
     const response = await fetch("/api/create-profile", {
       method: "POST",
       headers: {
@@ -30,14 +32,15 @@ const createProfileViaAPI = async (fullName: string, email: string, session: any
       }),
     })
 
+    const result = await response.json()
+    console.log("API Response:", result)
+
     if (!response.ok) {
-      const errorData = await response.json()
-      console.error("Profile API error:", errorData)
+      console.error("Profile API error:", result)
       return false
     }
 
-    const result = await response.json()
-    console.log("Profile created via API:", result)
+    console.log("Profile başarıyla oluşturuldu:", result)
     return true
   } catch (error) {
     console.error("Profile API call failed:", error)
@@ -109,7 +112,7 @@ export default function SignUpPage() {
     setErrors([])
 
     try {
-      console.log("Starting signup process...")
+      console.log("Kayıt işlemi başlatılıyor...")
 
       // Supabase Auth ile kullanıcı oluştur
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -121,6 +124,8 @@ export default function SignUpPage() {
           },
         },
       })
+
+      console.log("Auth Response:", { authData, authError })
 
       if (authError) {
         console.error("Auth error:", authError)
@@ -137,21 +142,24 @@ export default function SignUpPage() {
       }
 
       if (authData.user) {
-        console.log("User created successfully:", authData.user.id)
+        console.log("Kullanıcı başarıyla oluşturuldu:", authData.user.id)
 
-        // If we have a session, try to create profile
+        // Session varsa profile oluştur
         if (authData.session) {
-          console.log("User has session, creating profile...")
+          console.log("Session mevcut, profile oluşturuluyor...")
 
-          // Wait for trigger to potentially work
-          await new Promise((resolve) => setTimeout(resolve, 1500))
-
-          // Try to create profile via API as backup
+          // Profile oluşturmayı dene
           const profileCreated = await createProfileViaAPI(formData.fullName, formData.email, authData.session)
 
-          if (!profileCreated) {
-            console.log("Profile creation via API failed, but user is created")
+          if (profileCreated) {
+            console.log("Profile başarıyla oluşturuldu!")
+          } else {
+            console.error("Profile oluşturulamadı!")
+            setErrors(["Kullanıcı oluşturuldu ancak profil kaydedilemedi. Lütfen giriş yapın."])
+            return
           }
+        } else {
+          console.log("Session yok, e-posta doğrulaması gerekli olabilir")
         }
 
         setSuccess(true)
@@ -166,14 +174,13 @@ export default function SignUpPage() {
         setErrors(["Kullanıcı oluşturulamadı"])
       }
     } catch (error) {
-      console.error("Signup process error:", error)
+      console.error("Kayıt işlemi hatası:", error)
       setErrors(["Beklenmeyen bir hata oluştu: " + (error as Error).message])
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Update the success component to show different messages
   if (success) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600 flex items-center justify-center p-4">
@@ -181,11 +188,7 @@ export default function SignUpPage() {
           <CardContent className="p-6 text-center">
             <FiCheckCircle className="w-16 h-16 mx-auto text-green-400 mb-4" />
             <h2 className="text-2xl font-bold mb-2">Kayıt Başarılı!</h2>
-            <p className="text-white/80">
-              {formData.email.includes("@")
-                ? "E-posta doğrulaması gerekebilir. Giriş sayfasına yönlendiriliyorsunuz..."
-                : "Ana sayfaya yönlendiriliyorsunuz..."}
-            </p>
+            <p className="text-white/80">Profil bilgileriniz kaydedildi. Ana sayfaya yönlendiriliyorsunuz...</p>
           </CardContent>
         </Card>
       </div>
