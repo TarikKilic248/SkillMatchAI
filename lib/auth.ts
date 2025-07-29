@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { supabaseAdmin } from './supabase-admin'
 import { NextRequest } from 'next/server'
 
 export interface AuthUser {
@@ -97,7 +98,7 @@ export function validatePassword(password: string): { isValid: boolean; errors: 
  */
 export async function checkUserExists(email: string): Promise<boolean> {
   try {
-    const { data: users, error } = await supabase.auth.admin.listUsers()
+    const { data: users, error } = await supabaseAdmin.auth.admin.listUsers()
     
     if (error) {
       console.error('Error checking user existence:', error)

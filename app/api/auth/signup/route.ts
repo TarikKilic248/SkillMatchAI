@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 import { z } from 'zod'
 
 // Validation schema for signup
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
     const { email, password, full_name } = validatedData
 
     // Check if user already exists
-    const { data: existingUser, error: checkError } = await supabase.auth.admin.listUsers()
+    const { data: existingUser, error: checkError } = await supabaseAdmin.auth.admin.listUsers()
     
     if (checkError) {
       console.error('Error checking existing user:', checkError)
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create user with Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true, // Auto-confirm email for development
@@ -62,8 +63,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create profile in profiles table
-    const { error: profileError } = await supabase
+    // Create profile in profiles table using admin client
+    const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .insert({
         id: authData.user.id,
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Geçersiz veri formatı', details: error.errors },
+        { error: 'Geçersiz veri formatı', details: error.issues },
         { status: 400 }
       )
     }
