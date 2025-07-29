@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
@@ -29,13 +29,16 @@ import {
   FiArrowRight,
   FiArrowLeft,
   FiStar,
-  FiZap,
   FiAward,
-  FiUsers,
   FiCalendar,
   FiBookmark,
+  FiLogIn,
+  FiUserPlus,
+  FiUsers,
 } from "react-icons/fi"
 import { FaBrain } from "react-icons/fa"
+import { useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabase"
 
 interface UserData {
   learningGoal: string
@@ -63,9 +66,14 @@ interface Module {
 }
 
 interface LearningPlan {
+  id?: string
   title: string
   modules: Module[]
-  weeklyTests: Module[]
+  learningGoal?: string
+  dailyTime?: string
+  duration?: string
+  learningStyle?: string
+  targetLevel?: string
 }
 
 export default function MicroLearningPlatform() {
@@ -95,6 +103,56 @@ export default function MicroLearningPlatform() {
     }>
   >([])
   const [isAnimating, setIsAnimating] = useState(false)
+  const [user, setUser] = useState<any>(null)
+  const router = useRouter()
+
+  useEffect(() => {
+    checkUser()
+  }, [])
+
+  const checkUser = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (user) {
+      setUser(user)
+      // Check if user has existing plans
+      await loadUserPlans(user)
+    }
+  }
+
+  const loadUserPlans = async (user: any) => {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session) return
+
+      const response = await fetch("/api/get-user-plans", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      })
+
+      if (response.ok) {
+        const { plans } = await response.json()
+        if (plans && plans.length > 0) {
+          const activePlan = plans[0] // Get the most recent active plan
+          setLearningPlan(activePlan)
+          setUserData({
+            learningGoal: activePlan.learningGoal,
+            dailyTime: activePlan.dailyTime,
+            duration: activePlan.duration,
+            learningStyle: activePlan.learningStyle,
+            targetLevel: activePlan.targetLevel,
+          })
+          setCurrentScreen("dashboard")
+        }
+      }
+    } catch (error) {
+      console.error("Plan yükleme hatası:", error)
+    }
+  }
 
   const questions = [
     {
@@ -176,7 +234,7 @@ export default function MicroLearningPlatform() {
         { text: "Öğrenme hedeflerin analiz ediliyor...", progress: 45 },
         { text: "Kişiselleştirilmiş modüller hazırlanıyor...", progress: 60 },
         { text: "İçerik yapısı oluşturuluyor...", progress: 75 },
-        { text: "Son kontroller yapılıyor...", progress: 90 },
+        { text: "Veritabanına kaydediliyor...", progress: 90 },
       ]
 
       let stepIndex = 0
@@ -188,12 +246,20 @@ export default function MicroLearningPlatform() {
         }
       }, 800)
 
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session) {
+        throw new Error("Kullanıcı oturumu bulunamadı")
+      }
+
       const response = await fetch("/api/generate-plan", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify(userData),
+        body: JSON.stringify({ userData }),
       })
 
       if (!response.ok) {
@@ -212,80 +278,10 @@ export default function MicroLearningPlatform() {
       setCurrentScreen("dashboard")
     } catch (error) {
       console.error("Error generating plan:", error)
-      setLoadingText("Hata oluştu, varsayılan plan yükleniyor...")
+      setLoadingText("Hata oluştu, lütfen tekrar deneyin...")
 
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      const mockPlan: LearningPlan = {
-        title: `${userData.learningGoal} - Kişisel Öğrenme Planı`,
-        modules: [
-          {
-            id: "1",
-            title: "Temel Kavramlar",
-            description: "Konuya giriş ve temel kavramların öğrenilmesi",
-            objectives: ["Temel kavramları anlama", "Terminolojiyi öğrenme"],
-            resources: ["Video: Giriş dersi", "Makale: Temel kavramlar"],
-            quiz: {
-              question: "Bu modülde öğrendiğin en önemli kavram neydi?",
-              type: "open",
-            },
-            completed: false,
-            unlocked: true,
-            position: { x: 50, y: 90 },
-            type: "lesson",
-          },
-          {
-            id: "2",
-            title: "Pratik Uygulamalar",
-            description: "Öğrenilen kavramların pratikte uygulanması",
-            objectives: ["Pratik beceriler kazanma", "Uygulama geliştirme"],
-            resources: ["Interaktif uygulama", "Kod örnekleri"],
-            quiz: {
-              question: "Hangi uygulama türü daha faydalı oldu?",
-              options: ["Interaktif uygulamalar", "Kod örnekleri", "Video dersler", "Okuma materyalleri"],
-              type: "multiple",
-            },
-            completed: false,
-            unlocked: false,
-            position: { x: 30, y: 70 },
-            type: "lesson",
-          },
-          {
-            id: "quiz1",
-            title: "Hafta 1 Quiz",
-            description: "İlk haftanın değerlendirmesi",
-            objectives: ["Öğrenilenleri test etme"],
-            resources: [],
-            quiz: {
-              question: "Bu hafta hangi konularda zorluk yaşadın?",
-              type: "open",
-            },
-            completed: false,
-            unlocked: false,
-            position: { x: 70, y: 50 },
-            type: "quiz",
-          },
-          {
-            id: "exam1",
-            title: "Final Sınavı",
-            description: "Tüm öğrenilenlerin kapsamlı değerlendirmesi",
-            objectives: ["Genel değerlendirme"],
-            resources: [],
-            quiz: {
-              question: "Bu programı arkadaşlarına tavsiye eder misin?",
-              options: ["Kesinlikle evet", "Evet", "Kararsızım", "Hayır"],
-              type: "multiple",
-            },
-            completed: false,
-            unlocked: false,
-            position: { x: 50, y: 10 },
-            type: "exam",
-          },
-        ],
-      }
-
-      setLearningPlan(mockPlan)
-      setCurrentScreen("dashboard")
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+      setCurrentScreen("questions")
     }
   }
 
@@ -322,105 +318,70 @@ export default function MicroLearningPlatform() {
 
   const completeModule = async () => {
     if (currentModule && learningPlan) {
-      if (feedback.trim()) {
-        const feedbackData = {
-          moduleId: currentModule.id,
-          feedback: feedback.trim(),
-          timestamp: new Date().toISOString(),
-        }
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+        if (!session) return
 
-        try {
+        // Save feedback if provided
+        if (feedback.trim()) {
           await fetch("/api/save-feedback", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
             },
-            body: JSON.stringify(feedbackData),
+            body: JSON.stringify({
+              moduleId: currentModule.id,
+              feedback: feedback.trim(),
+            }),
           })
-
-          setUserFeedbacks((prev) => [...prev, feedbackData])
-        } catch (error) {
-          console.error("Feedback kaydedilemedi:", error)
         }
+
+        // Update module completion status
+        await fetch("/api/update-module", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            moduleId: currentModule.id,
+            completed: true,
+            unlockNext: true,
+          }),
+        })
+
+        // Update local state
+        const updatedModules = learningPlan.modules.map((m) => {
+          if (m.id === currentModule.id) {
+            return { ...m, completed: true }
+          }
+          return m
+        })
+
+        // Find current module index and unlock next
+        const currentIndex = updatedModules.findIndex((m) => m.id === currentModule.id)
+        if (currentIndex < updatedModules.length - 1) {
+          updatedModules[currentIndex + 1].unlocked = true
+        }
+
+        setLearningPlan({ ...learningPlan, modules: updatedModules })
+        setCurrentScreen("dashboard")
+        setCurrentModule(null)
+        setFeedback("")
+      } catch (error) {
+        console.error("Modül tamamlama hatası:", error)
       }
-
-      // Create sequential order for proper unlocking
-      const sequentialModules = [...learningPlan.modules].sort((a, b) => {
-        const getNumericId = (id: string) => {
-          const match = id.match(/\d+/)
-          return match ? Number.parseInt(match[0]) : 0
-        }
-        return getNumericId(a.id) - getNumericId(b.id)
-      })
-
-      const updatedModules = sequentialModules.map((m) => {
-        if (m.id === currentModule.id) {
-          return { ...m, completed: true }
-        }
-        return m
-      })
-
-      // Find current module index in sequential order and unlock next
-      const currentIndex = updatedModules.findIndex((m) => m.id === currentModule.id)
-      if (currentIndex < updatedModules.length - 1) {
-        updatedModules[currentIndex + 1].unlocked = true
-      }
-
-      setLearningPlan({ ...learningPlan, modules: updatedModules })
-      setCurrentScreen("dashboard")
-      setCurrentModule(null)
-      setFeedback("")
     }
   }
 
   const regeneratePlan = async () => {
     setShowRegenerateDialog(false)
-    setCurrentScreen("loading")
-    setLoadingProgress(0)
-    setLoadingText("Geri bildirimleriniz analiz ediliyor...")
-
-    try {
-      const completedModuleIds = learningPlan?.modules.filter((m) => m.completed).map((m) => m.id) || []
-
-      const response = await fetch("/api/regenerate-plan", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userData,
-          feedbacks: userFeedbacks,
-          completedModules: completedModuleIds,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error("Plan yeniden oluşturulamadı")
-      }
-
-      const steps = [
-        { text: "Geri bildirimleriniz analiz ediliyor...", progress: 25 },
-        { text: "Gemini ile plan optimize ediliyor...", progress: 50 },
-        { text: "Yeni modüller oluşturuluyor...", progress: 75 },
-        { text: "Plan hazırlanıyor...", progress: 100 },
-      ]
-
-      for (const step of steps) {
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-        setLoadingText(step.text)
-        setLoadingProgress(step.progress)
-      }
-
-      const newPlan = await response.json()
-      setLearningPlan(newPlan)
-      setUserFeedbacks([])
-      setCurrentScreen("dashboard")
-    } catch (error) {
-      console.error("Plan yeniden oluşturulurken hata:", error)
-      setLoadingText("Hata oluştu, önceki plan geri yükleniyor...")
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      setCurrentScreen("dashboard")
-    }
+    // For now, just redirect to questions to create a new plan
+    setCurrentScreen("questions")
+    setCurrentQuestion(0)
   }
 
   const getModuleIcon = (type: string, completed: boolean, unlocked: boolean) => {
@@ -451,6 +412,11 @@ export default function MicroLearningPlatform() {
     }
   }
 
+  // If user is logged in but no plan, show questions
+  if (user && !learningPlan && currentScreen === "welcome") {
+    setCurrentScreen("questions")
+  }
+
   if (currentScreen === "welcome") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-violet-600 via-purple-600 to-pink-600 flex items-center justify-center p-4 overflow-hidden relative font-inter">
@@ -461,44 +427,60 @@ export default function MicroLearningPlatform() {
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-white/5 rounded-full blur-3xl animate-pulse delay-500"></div>
         </div>
 
-        <Card className="w-full max-w-lg bg-white/10 backdrop-blur-xl border-white/20 text-white shadow-2xl relative z-10">
-          <CardContent className="p-10 text-center">
-            <div className="mb-8">
-              <div className="relative mb-6">
-                <FiStar className="w-20 h-20 mx-auto text-yellow-300 animate-bounce" />
-                <div className="absolute inset-0 w-20 h-20 mx-auto bg-yellow-300/20 rounded-full blur-xl animate-pulse"></div>
+        <Card className="w-full max-w-2xl bg-white/10 backdrop-blur-xl border-white/20 text-white shadow-2xl relative z-10">
+          <CardHeader className="text-center">
+            <div className="relative mb-6">
+              <FiBookOpen className="w-20 h-20 mx-auto text-white animate-float" />
+              <div className="absolute inset-0 w-20 h-20 mx-auto bg-white/20 rounded-full blur-xl animate-pulse"></div>
+            </div>
+            <CardTitle className="text-4xl font-bold bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent mb-4">
+              Mikro Öğrenme Platformu
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-8">
+            {/* Özellikler */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="text-center">
+                <FiTarget className="w-8 h-8 mx-auto mb-2 text-blue-300" />
+                <h3 className="font-semibold mb-1">Hedef Odaklı</h3>
+                <p className="text-sm text-white/70">Kişisel hedeflerinize uygun planlar</p>
               </div>
-              <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-white to-yellow-200 bg-clip-text text-transparent">
-                Hoş Geldin!
-              </h1>
-              <p className="text-white/80 text-lg leading-relaxed">
-                Kişiselleştirilmiş öğrenme yolculuğuna başlamaya hazır mısın? AI destekli planınızı oluşturalım.
-              </p>
+              <div className="text-center">
+                <FiTrendingUp className="w-8 h-8 mx-auto mb-2 text-green-300" />
+                <h3 className="font-semibold mb-1">İlerleme Takibi</h3>
+                <p className="text-sm text-white/70">Gelişiminizi görsel olarak takip edin</p>
+              </div>
+              <div className="text-center">
+                <FiUsers className="w-8 h-8 mx-auto mb-2 text-purple-300" />
+                <h3 className="font-semibold mb-1">Topluluk</h3>
+                <p className="text-sm text-white/70">Diğer öğrencilerle etkileşim kurun</p>
+              </div>
             </div>
 
-            <div className="space-y-4 mb-8">
-              <div className="flex items-center justify-center space-x-2 text-white/70">
-                <FiZap className="w-5 h-5 text-yellow-400" />
-                <span>AI destekli kişiselleştirme</span>
-              </div>
-              <div className="flex items-center justify-center space-x-2 text-white/70">
-                <FiTarget className="w-5 h-5 text-green-400" />
-                <span>Hedef odaklı modüller</span>
-              </div>
-              <div className="flex items-center justify-center space-x-2 text-white/70">
-                <FiUsers className="w-5 h-5 text-blue-400" />
-                <span>İnteraktif öğrenme deneyimi</span>
-              </div>
+            {/* Giriş Butonları */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button
+                onClick={() => router.push("/signup")}
+                className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white text-lg px-8 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
+                size="lg"
+              >
+                <FiUserPlus className="w-5 h-5 mr-2" />
+                Kayıt Ol
+              </Button>
+              <Button
+                onClick={() => router.push("/login")}
+                variant="outline"
+                className="w-full sm:w-auto bg-white/10 border-white/30 text-white hover:bg-white/20 text-lg px-8 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
+                size="lg"
+              >
+                <FiLogIn className="w-5 h-5 mr-2" />
+                Giriş Yap
+              </Button>
             </div>
 
-            <Button
-              onClick={() => setCurrentScreen("questions")}
-              className="w-full bg-gradient-to-r from-white/20 to-white/30 hover:from-white/30 hover:to-white/40 text-white border-white/30 text-lg py-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
-              size="lg"
-            >
-              Başlayalım
-              <FiArrowRight className="w-5 h-5 ml-2" />
-            </Button>
+            <p className="text-center text-white/60 text-sm mt-6">
+              Ücretsiz hesap oluşturun ve öğrenmeye hemen başlayın
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -1029,7 +1011,7 @@ export default function MicroLearningPlatform() {
                 </Button>
                 <Button
                   onClick={completeModule}
-                  className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white px-8 py-4 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
+                  className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-500 text-white px-8 py-4 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
                 >
                   <FiCheckCircle className="w-4 h-4 mr-2" />
                   Tamamla
