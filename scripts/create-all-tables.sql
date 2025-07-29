@@ -139,17 +139,29 @@ CREATE POLICY "Users can insert own feedback" ON user_feedbacks
 CREATE POLICY "Users can view own feedback" ON user_feedbacks
     FOR SELECT USING (auth.uid() = user_id);
 
--- Create function to handle new user signup
+-- Create function to handle new user signup with better error handling
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
+  -- Only insert if profile doesn't already exist
   INSERT INTO public.profiles (id, full_name, email)
-  VALUES (NEW.id, NEW.raw_user_meta_data->>'full_name', NEW.email);
+  VALUES (
+    NEW.id, 
+    COALESCE(NEW.raw_user_meta_data->>'full_name', 'User'), 
+    NEW.email
+  )
+  ON CONFLICT (id) DO NOTHING;
+  
   RETURN NEW;
+EXCEPTION
+  WHEN OTHERS THEN
+    -- Log the error but don't fail the user creation
+    RAISE WARNING 'Failed to create profile for user %: %', NEW.id, SQLERRM;
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Create trigger for automatic profile creation
+-- Recreate the trigger
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users

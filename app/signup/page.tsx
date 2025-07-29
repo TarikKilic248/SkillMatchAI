@@ -15,6 +15,36 @@ import { supabase } from "@/lib/supabase"
 import { validateFullName, validateEmail, validatePassword, validatePasswordConfirmation } from "@/lib/validation"
 import { checkRateLimit, getRemainingTime } from "@/lib/rate-limit"
 
+// Add this helper function before the component
+const createProfileViaAPI = async (fullName: string, email: string, session: any) => {
+  try {
+    const response = await fetch("/api/create-profile", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        fullName: fullName.trim(),
+        email: email.trim().toLowerCase(),
+      }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      console.error("Profile API error:", errorData)
+      return false
+    }
+
+    const result = await response.json()
+    console.log("Profile created via API:", result)
+    return true
+  } catch (error) {
+    console.error("Profile API call failed:", error)
+    return false
+  }
+}
+
 export default function SignUpPage() {
   const router = useRouter()
   const [formData, setFormData] = useState({
@@ -62,7 +92,7 @@ export default function SignUpPage() {
     e.preventDefault()
 
     // Rate limiting kontrolü
-    const clientIP = "user-signup" // Gerçek uygulamada IP adresi kullanılabilir
+    const clientIP = "user-signup"
     if (!checkRateLimit(clientIP, 3, 15 * 60 * 1000)) {
       const remainingTime = Math.ceil(getRemainingTime(clientIP) / 1000 / 60)
       setErrors([`Çok fazla deneme yaptınız. ${remainingTime} dakika sonra tekrar deneyin.`])
@@ -80,13 +110,8 @@ export default function SignUpPage() {
 
     try {
       console.log("Starting signup process...")
-      console.log("Form data:", {
-        fullName: formData.fullName,
-        email: formData.email,
-        passwordLength: formData.password.length,
-      })
 
-      // Supabase Auth ile kullanıcı oluştur - metadata ile birlikte
+      // Supabase Auth ile kullanıcı oluştur
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
@@ -96,8 +121,6 @@ export default function SignUpPage() {
           },
         },
       })
-
-      console.log("Auth response:", { authData, authError })
 
       if (authError) {
         console.error("Auth error:", authError)
@@ -116,56 +139,30 @@ export default function SignUpPage() {
       if (authData.user) {
         console.log("User created successfully:", authData.user.id)
 
-        // Kısa bir bekleme süresi - trigger'ın çalışması için
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+        // If we have a session, try to create profile
+        if (authData.session) {
+          console.log("User has session, creating profile...")
 
-        // Manuel olarak profil oluştur (trigger çalışmazsa)
-        try {
-          console.log("Attempting to create profile manually...")
+          // Wait for trigger to potentially work
+          await new Promise((resolve) => setTimeout(resolve, 1500))
 
-          const profileData = {
-            id: authData.user.id,
-            full_name: formData.fullName.trim(),
-            email: formData.email.trim().toLowerCase(),
+          // Try to create profile via API as backup
+          const profileCreated = await createProfileViaAPI(formData.fullName, formData.email, authData.session)
+
+          if (!profileCreated) {
+            console.log("Profile creation via API failed, but user is created")
           }
-
-          console.log("Profile data to insert:", profileData)
-
-          const { data: profileResult, error: profileError } = await supabase
-            .from("profiles")
-            .insert(profileData)
-            .select()
-
-          console.log("Profile creation result:", { profileResult, profileError })
-
-          if (profileError) {
-            console.error("Profile creation error:", profileError)
-
-            // Eğer profil zaten varsa (trigger çalıştıysa) hata verme
-            if (!profileError.message.includes("duplicate key")) {
-              setErrors([`Profil oluşturulamadı: ${profileError.message}`])
-              return
-            } else {
-              console.log("Profile already exists (trigger worked)")
-            }
-          } else {
-            console.log("Profile created successfully via manual insert")
-          }
-        } catch (profileErr) {
-          console.error("Profile creation failed:", profileErr)
-          setErrors(["Profil oluşturulurken bir hata oluştu"])
-          return
         }
 
-        console.log("Signup process completed successfully")
         setSuccess(true)
-
         setTimeout(() => {
-          // Kayıt başarılı, ana sayfaya yönlendir
-          router.push("/")
+          if (authData.session) {
+            router.push("/")
+          } else {
+            router.push("/login")
+          }
         }, 2000)
       } else {
-        console.error("No user returned from signup")
         setErrors(["Kullanıcı oluşturulamadı"])
       }
     } catch (error) {
@@ -176,6 +173,7 @@ export default function SignUpPage() {
     }
   }
 
+  // Update the success component to show different messages
   if (success) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600 flex items-center justify-center p-4">
@@ -183,7 +181,11 @@ export default function SignUpPage() {
           <CardContent className="p-6 text-center">
             <FiCheckCircle className="w-16 h-16 mx-auto text-green-400 mb-4" />
             <h2 className="text-2xl font-bold mb-2">Kayıt Başarılı!</h2>
-            <p className="text-white/80">Ana sayfaya yönlendiriliyorsunuz...</p>
+            <p className="text-white/80">
+              {formData.email.includes("@")
+                ? "E-posta doğrulaması gerekebilir. Giriş sayfasına yönlendiriliyorsunuz..."
+                : "Ana sayfaya yönlendiriliyorsunuz..."}
+            </p>
           </CardContent>
         </Card>
       </div>
