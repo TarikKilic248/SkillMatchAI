@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { supabase } from "@/lib/supabase"
+import { supabaseAdmin } from "@/lib/supabase-admin"
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     const {
       data: { user },
       error: userError,
-    } = await supabase.auth.getUser(token)
+    } = await supabaseAdmin.auth.getUser(token)
 
     if (userError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update the current module
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from("modules")
       .update({ completed: completed || false })
       .eq("id", moduleId)
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     // If unlockNext is true, unlock the next module
     if (unlockNext) {
       // Get current module's plan and order
-      const { data: currentModule, error: moduleError } = await supabase
+      const { data: currentModule, error: moduleError } = await supabaseAdmin
         .from("modules")
         .select("plan_id, module_order")
         .eq("id", moduleId)
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
       if (!moduleError && currentModule) {
         // Unlock next module
-        const { error: unlockError } = await supabase
+        const { error: unlockError } = await supabaseAdmin
           .from("modules")
           .update({ unlocked: true })
           .eq("plan_id", currentModule.plan_id)
