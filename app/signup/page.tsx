@@ -11,45 +11,15 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { FiUserPlus, FiMail, FiLock, FiUser, FiAlertCircle, FiCheckCircle } from "react-icons/fi"
-import { supabase } from "@/lib/supabase"
 import { validateFullName, validateEmail, validatePassword, validatePasswordConfirmation } from "@/lib/validation"
 import { checkRateLimit, getRemainingTime } from "@/lib/rate-limit"
+import { useAuth } from "@/lib/auth-context"
 
-// Profile oluşturma fonksiyonu
-const createProfileViaAPI = async (fullName: string, email: string, session: any) => {
-  try {
-    console.log("API ile profile oluşturuluyor:", { fullName, email, sessionExists: !!session })
 
-    const response = await fetch("/api/create-profile", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        fullName: fullName.trim(),
-        email: email.trim().toLowerCase(),
-      }),
-    })
-
-    const result = await response.json()
-    console.log("API Response:", result)
-
-    if (!response.ok) {
-      console.error("Profile API error:", result)
-      return false
-    }
-
-    console.log("Profile başarıyla oluşturuldu:", result)
-    return true
-  } catch (error) {
-    console.error("Profile API call failed:", error)
-    return false
-  }
-}
 
 export default function SignUpPage() {
   const router = useRouter()
+  const { signUp } = useAuth()
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -114,68 +84,20 @@ export default function SignUpPage() {
     try {
       console.log("Kayıt işlemi başlatılıyor...")
 
-      // Supabase Auth ile kullanıcı oluştur
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email.trim().toLowerCase(),
-        password: formData.password,
-        options: {
-          data: {
-            full_name: formData.fullName.trim(),
-          },
-        },
-      })
+      const result = await signUp(formData.email.trim().toLowerCase(), formData.password, formData.fullName.trim())
 
-      console.log("Auth Response:", { authData, authError })
-
-      if (authError) {
-        console.error("Auth error:", authError)
-        if (authError.message.includes("already registered")) {
-          setErrors(["Bu e-posta adresi zaten kayıtlı"])
-        } else if (authError.message.includes("Password")) {
-          setErrors(["Şifre gereksinimleri karşılanmıyor"])
-        } else if (authError.message.includes("Email")) {
-          setErrors(["E-posta adresi geçersiz"])
-        } else {
-          setErrors(["Kayıt olurken bir hata oluştu: " + authError.message])
-        }
-        return
-      }
-
-      if (authData.user) {
-        console.log("Kullanıcı başarıyla oluşturuldu:", authData.user.id)
-
-        // Session varsa profile oluştur
-        if (authData.session) {
-          console.log("Session mevcut, profile oluşturuluyor...")
-
-          // Profile oluşturmayı dene
-          const profileCreated = await createProfileViaAPI(formData.fullName, formData.email, authData.session)
-
-          if (profileCreated) {
-            console.log("Profile başarıyla oluşturuldu!")
-          } else {
-            console.error("Profile oluşturulamadı!")
-            setErrors(["Kullanıcı oluşturuldu ancak profil kaydedilemedi. Lütfen giriş yapın."])
-            return
-          }
-        } else {
-          console.log("Session yok, e-posta doğrulaması gerekli olabilir")
-        }
-
+      if (result.success) {
+        console.log("Kayıt ve giriş başarılı!")
         setSuccess(true)
         setTimeout(() => {
-          if (authData.session) {
-            router.push("/")
-          } else {
-            router.push("/login")
-          }
+          router.push("/")
         }, 2000)
       } else {
-        setErrors(["Kullanıcı oluşturulamadı"])
+        setErrors([result.error || "Kayıt başarısız"])
       }
     } catch (error) {
       console.error("Kayıt işlemi hatası:", error)
-      setErrors(["Beklenmeyen bir hata oluştu: " + (error as Error).message])
+      setErrors(["Beklenmeyen bir hata oluştu"])
     } finally {
       setIsLoading(false)
     }

@@ -11,12 +11,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { FiLogIn, FiMail, FiLock, FiAlertCircle, FiCheckCircle } from "react-icons/fi"
-import { supabase } from "@/lib/supabase"
 import { validateEmail } from "@/lib/validation"
 import { checkRateLimit, getRemainingTime } from "@/lib/rate-limit"
+import { useAuth } from "@/lib/auth-context"
 
 export default function LoginPage() {
   const router = useRouter()
+  const { signIn } = useAuth()
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -53,23 +54,7 @@ export default function LoginPage() {
     return allErrors
   }
 
-  const checkUserExists = async (email: string) => {
-    try {
-      // Kullanıcının profiles tablosunda olup olmadığını kontrol et
-      const { data: profile, error } = await supabase
-        .from("profiles")
-        .select("id, email")
-        .eq("email", email.trim().toLowerCase())
-        .single()
 
-      console.log("Profile check result:", { profile, error })
-
-      return !!profile
-    } catch (error) {
-      console.error("User existence check error:", error)
-      return false
-    }
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -94,41 +79,16 @@ export default function LoginPage() {
     try {
       console.log("Giriş işlemi başlatılıyor...")
 
-      // Önce kullanıcının var olup olmadığını kontrol et
-      const userExists = await checkUserExists(formData.email)
+      const result = await signIn(formData.email.trim().toLowerCase(), formData.password)
 
-      if (!userExists) {
-        setErrors(["Bu e-posta adresi ile kayıtlı bir kullanıcı bulunamadı. Lütfen kayıt olun."])
-        return
-      }
-
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: formData.email.trim().toLowerCase(),
-        password: formData.password,
-      })
-
-      console.log("Auth Response:", { authData, authError })
-
-      if (authError) {
-        console.error("Login error:", authError)
-        if (authError.message.includes("Invalid login credentials")) {
-          setErrors(["E-posta veya şifre hatalı"])
-        } else if (authError.message.includes("Email not confirmed")) {
-          setErrors(["E-posta adresinizi doğrulamanız gerekiyor. E-posta kutunuzu kontrol edin."])
-        } else if (authError.message.includes("Too many requests")) {
-          setErrors(["Çok fazla deneme yaptınız. Lütfen daha sonra tekrar deneyin."])
-        } else {
-          setErrors(["Giriş yapılırken bir hata oluştu: " + authError.message])
-        }
-        return
-      }
-
-      if (authData.user) {
-        console.log("Giriş başarılı:", authData.user.id)
+      if (result.success) {
+        console.log("Giriş başarılı!")
         setSuccess(true)
         setTimeout(() => {
           router.push("/")
         }, 1000)
+      } else {
+        setErrors([result.error || "Giriş başarısız"])
       }
     } catch (error) {
       console.error("Giriş hatası:", error)
