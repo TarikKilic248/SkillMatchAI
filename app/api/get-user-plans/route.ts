@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { supabase } from "@/lib/supabase"
+import { supabaseAdmin } from "@/lib/supabase-admin"
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,14 +12,14 @@ export async function GET(request: NextRequest) {
     const {
       data: { user },
       error: userError,
-    } = await supabase.auth.getUser(token)
+    } = await supabaseAdmin.auth.getUser(token)
 
     if (userError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     // Get user's active learning plans
-    const { data: plans, error: plansError } = await supabase
+    const { data: plans, error: plansError } = await supabaseAdmin
       .from("learning_plans")
       .select("*")
       .eq("user_id", user.id)
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     // Get modules for each plan
     const plansWithModules = await Promise.all(
       plans.map(async (plan) => {
-        const { data: modules, error: modulesError } = await supabase
+        const { data: modules, error: modulesError } = await supabaseAdmin
           .from("modules")
           .select("*")
           .eq("plan_id", plan.id)

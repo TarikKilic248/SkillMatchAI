@@ -38,7 +38,7 @@ import {
 } from "react-icons/fi"
 import { FaBrain } from "react-icons/fa"
 import { useRouter } from "next/navigation"
-import { supabase } from "@/lib/supabase"
+import { useAuth } from "@/lib/auth-context"
 
 interface UserData {
   learningGoal: string
@@ -103,34 +103,24 @@ export default function MicroLearningPlatform() {
     }>
   >([])
   const [isAnimating, setIsAnimating] = useState(false)
-  const [user, setUser] = useState<any>(null)
+  const { user, signOut } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    checkUser()
-  }, [])
-
-  const checkUser = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
     if (user) {
-      setUser(user)
       // Check if user has existing plans
-      await loadUserPlans(user)
+      loadUserPlans()
     }
-  }
+  }, [user])
 
-  const loadUserPlans = async (user: any) => {
+  const loadUserPlans = async () => {
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      if (!session) return
+      const token = localStorage.getItem('access_token')
+      if (!token) return
 
       const response = await fetch("/api/get-user-plans", {
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
       })
 
@@ -246,10 +236,8 @@ export default function MicroLearningPlatform() {
         }
       }, 800)
 
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      if (!session) {
+      const token = localStorage.getItem('access_token')
+      if (!token) {
         throw new Error("Kullanıcı oturumu bulunamadı")
       }
 
@@ -257,7 +245,7 @@ export default function MicroLearningPlatform() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ userData }),
       })
@@ -319,10 +307,8 @@ export default function MicroLearningPlatform() {
   const completeModule = async () => {
     if (currentModule && learningPlan) {
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
-        if (!session) return
+        const token = localStorage.getItem('access_token')
+        if (!token) return
 
         // Save feedback if provided
         if (feedback.trim()) {
@@ -330,7 +316,7 @@ export default function MicroLearningPlatform() {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${session.access_token}`,
+              Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({
               moduleId: currentModule.id,
@@ -344,7 +330,7 @@ export default function MicroLearningPlatform() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             moduleId: currentModule.id,
@@ -672,6 +658,29 @@ export default function MicroLearningPlatform() {
         {/* Fixed Header */}
         <div className="sticky top-0 z-50 bg-white/10 backdrop-blur-xl border-b border-white/20">
           <div className="max-w-4xl mx-auto p-6">
+            {/* User Info and Logout */}
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-full flex items-center justify-center">
+                  <span className="text-white font-semibold text-sm">
+                    {user?.full_name?.charAt(0) || 'U'}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-white/90 text-sm">Hoş geldin,</p>
+                  <p className="text-white font-semibold">{user?.full_name || 'Kullanıcı'}</p>
+                </div>
+              </div>
+              <Button
+                onClick={signOut}
+                variant="outline"
+                className="bg-white/10 border-white/20 text-white hover:bg-white/20 px-4 py-2 rounded-xl transition-all duration-300"
+              >
+                <FiLogIn className="w-4 h-4 mr-2" />
+                Çıkış Yap
+              </Button>
+            </div>
+
             <div className="text-center mb-6">
               <h1 className="text-3xl font-bold text-white mb-4 bg-gradient-to-r from-white to-cyan-200 bg-clip-text text-transparent">
                 {learningPlan.title}

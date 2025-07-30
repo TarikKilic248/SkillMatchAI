@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { generateText } from "ai"
 import { google } from "@ai-sdk/google"
-import { supabase } from "@/lib/supabase"
+import { supabaseAdmin } from "@/lib/supabase-admin"
 
 interface UserData {
   learningGoal: string
@@ -31,6 +31,8 @@ interface Module {
 // Advanced JSON cleaning and repair function
 function repairAndParseJSON(text: string) {
   try {
+    console.log("Attempting to parse JSON from:", text.substring(0, 200))
+    
     // Step 1: Basic cleaning
     let cleaned = text
       .replace(/```json\s*/g, "")
@@ -63,6 +65,10 @@ function repairAndParseJSON(text: string) {
       .replace(/'/g, '"')
       // Remove any trailing text after the last }
       .replace(/}\s*[^}]*$/, "}")
+      // Fix unescaped quotes in strings
+      .replace(/"([^"]*)"([^"]*)"([^"]*)"/g, '"$1$2$3"')
+
+    console.log("Cleaned JSON:", cleaned.substring(0, 200))
 
     // Step 4: Try to parse
     try {
@@ -80,7 +86,10 @@ function repairAndParseJSON(text: string) {
         .replace(/:\s*"(true|false|null)"/g, ": $1")
         // Fix number values that got quoted
         .replace(/:\s*"(\d+)"/g, ": $1")
+        // Fix broken strings
+        .replace(/"([^"]*)\s*\n\s*([^"]*)"/g, '"$1 $2"')
 
+      console.log("Repaired JSON:", cleaned.substring(0, 200))
       return JSON.parse(cleaned)
     }
   } catch (error) {
@@ -183,7 +192,7 @@ async function callGeminiSafely(prompt: string) {
       const { text } = await generateText({
         model: google(model),
         prompt,
-        maxTokens: 2000,
+        maxTokens: 3000,
         temperature: 0.1, // Very low temperature for consistent JSON
       })
 
@@ -191,6 +200,7 @@ async function callGeminiSafely(prompt: string) {
         throw new Error("Response too short")
       }
 
+      console.log("Raw Gemini response:", text.substring(0, 500))
       return text
     } catch (error) {
       console.error(`Model ${model} failed:`, error)
@@ -205,7 +215,7 @@ async function callGeminiSafely(prompt: string) {
 async function savePlanToDatabase(userData: UserData, planData: any, userId: string) {
   try {
     // Create learning plan
-    const { data: planRecord, error: planError } = await supabase
+    const { data: planRecord, error: planError } = await supabaseAdmin
       .from("learning_plans")
       .insert({
         user_id: userId,
@@ -243,12 +253,12 @@ async function savePlanToDatabase(userData: UserData, planData: any, userId: str
       position_y: module.position?.y || 50,
     }))
 
-    const { error: modulesError } = await supabase.from("modules").insert(modulesToInsert)
+    const { error: modulesError } = await supabaseAdmin.from("modules").insert(modulesToInsert)
 
     if (modulesError) {
       console.error("Modül kaydetme hatası:", modulesError)
       // Plan kaydını geri al
-      await supabase.from("learning_plans").delete().eq("id", planRecord.id)
+      await supabaseAdmin.from("learning_plans").delete().eq("id", planRecord.id)
       throw new Error("Modüller kaydedilemedi")
     }
 
@@ -260,11 +270,9 @@ async function savePlanToDatabase(userData: UserData, planData: any, userId: str
 }
 
 export async function POST(request: NextRequest) {
-  let userData: UserData
-
   try {
     const body = await request.json()
-    userData = body.userData || body
+    const userData: UserData = body.userData || body
 
     // Get user from auth
     const authHeader = request.headers.get("authorization")
@@ -276,7 +284,7 @@ export async function POST(request: NextRequest) {
     const {
       data: { user },
       error: userError,
-    } = await supabase.auth.getUser(token)
+    } = await supabaseAdmin.auth.getUser(token)
 
     if (userError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -307,7 +315,7 @@ Requirements:
 - Style: ${userData.learningStyle}
 - Level: ${userData.targetLevel}
 
-Return ONLY this exact JSON structure with NO additional text:
+Return ONLY valid JSON with this exact structure (no markdown, no extra text):
 
 {
   "title": "Learning Plan Title",
@@ -327,7 +335,13 @@ Return ONLY this exact JSON structure with NO additional text:
   ]
 }
 
-Make every 3rd module type "quiz" and last module type "exam". Include exactly ${moduleCount} modules.`
+Rules:
+- Make every 3rd module type "quiz" 
+- Make the last module type "exam"
+- Include exactly ${moduleCount} modules
+- Use simple, clear titles and descriptions
+- Keep objectives and resources as short arrays
+- Ensure all JSON is properly formatted`
 
       try {
         // Try Gemini first
@@ -423,15 +437,13 @@ Make every 3rd module type "quiz" and last module type "exam". Include exactly $
     console.error("Complete API failure:", error)
 
     // Emergency fallback - always return a working plan
-    const emergencyPlan = createFallbackPlan(
-      userData || {
-        learningGoal: "Genel Öğrenme",
-        dailyTime: "1hour",
-        duration: "4weeks",
-        learningStyle: "mixed",
-        targetLevel: "intermediate",
-      },
-    )
+    const emergencyPlan = createFallbackPlan({
+      learningGoal: "Genel Öğrenme",
+      dailyTime: "1hour",
+      duration: "4weeks",
+      learningStyle: "mixed",
+      targetLevel: "intermediate",
+    })
 
     return NextResponse.json(emergencyPlan)
   }
