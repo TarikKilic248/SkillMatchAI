@@ -35,6 +35,10 @@ import {
   FiLogIn,
   FiUserPlus,
   FiUsers,
+  FiEye,
+  FiFileText,
+  FiVideo,
+  FiHeadphones,
 } from "react-icons/fi"
 import { FaBrain } from "react-icons/fa"
 import { useRouter } from "next/navigation"
@@ -48,12 +52,21 @@ interface UserData {
   targetLevel: string
 }
 
+interface ContentPage {
+  id: string
+  title: string
+  type: "text" | "video" | "audio" | "interactive"
+  content: string
+  duration: number // minutes
+}
+
 interface Module {
   id: string
   title: string
   description: string
   objectives: string[]
   resources: string[]
+  contentPages: ContentPage[]
   quiz: {
     question: string
     options?: string[]
@@ -77,9 +90,10 @@ interface LearningPlan {
 }
 
 export default function MicroLearningPlatform() {
-  const [currentScreen, setCurrentScreen] = useState<"welcome" | "questions" | "loading" | "dashboard" | "module">(
-    "welcome",
-  )
+  const { user, signOut, loading: authLoading } = useAuth()
+  const [currentScreen, setCurrentScreen] = useState<
+    "welcome" | "questions" | "loading" | "dashboard" | "module" | "module-content" | "module-test" | "module-complete"
+  >("loading") // Başlangıçta genel bir yükleme durumu
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [userData, setUserData] = useState<UserData>({
     learningGoal: "",
@@ -103,20 +117,41 @@ export default function MicroLearningPlatform() {
     }>
   >([])
   const [isAnimating, setIsAnimating] = useState(false)
-  const { user, signOut } = useAuth()
+  const [moduleProgress, setModuleProgress] = useState(0)
+  const [selectedAnswer, setSelectedAnswer] = useState<string>("")
+  const [correctAnswers, setCorrectAnswers] = useState(0)
+  const [wrongAnswers, setWrongAnswers] = useState(0)
+  const [currentContentPage, setCurrentContentPage] = useState(0)
+  const [viewedContentPages, setViewedContentPages] = useState<Set<number>>(new Set())
+  const [hasAttemptedPlanLoad, setHasAttemptedPlanLoad] = useState(false) // Plan yükleme denemesi yapıldı mı?
   const router = useRouter()
 
   useEffect(() => {
-    if (user) {
-      // Check if user has existing plans
-      loadUserPlans()
+    if (!authLoading) {
+      // Sadece kimlik doğrulama durumu bilindiğinde devam et
+      if (user) {
+        // Kullanıcı giriş yapmış, planı yüklemeye çalış
+        loadUserPlans()
+      } else {
+        // Kullanıcı yok, hoş geldin ekranına git
+        setCurrentScreen("welcome")
+        setHasAttemptedPlanLoad(true) // Giriş yapmamış kullanıcı için kontrol tamamlandı
+      }
     }
-  }, [user])
+  }, [user, authLoading]) // user ve authLoading değiştiğinde tetikle
+
+  const getNumericId = (id: string) => {
+    const match = id.match(/\d+/)
+    return match ? Number.parseInt(match[0]) : 0
+  }
 
   const loadUserPlans = async () => {
     try {
-      const token = localStorage.getItem('access_token')
-      if (!token) return
+      const token = localStorage.getItem("access_token")
+      if (!token) {
+        setCurrentScreen("welcome")
+        return
+      }
 
       const response = await fetch("/api/get-user-plans", {
         headers: {
@@ -127,8 +162,53 @@ export default function MicroLearningPlatform() {
       if (response.ok) {
         const { plans } = await response.json()
         if (plans && plans.length > 0) {
-          const activePlan = plans[0] // Get the most recent active plan
-          setLearningPlan(activePlan)
+          const activePlan = plans[0] // En son aktif planı al
+
+          // Modüllere örnek içerik sayfaları ekle (varsa mevcutları koru) ve sırala
+          const updatedPlan = {
+            ...activePlan,
+            modules: activePlan.modules
+              .map((module: Module) => ({
+                ...module,
+                contentPages: module.contentPages || [
+                  {
+                    id: "content-1",
+                    title: "Giriş ve Temel Kavramlar",
+                    type: "text",
+                    content:
+                      "Bu modülde öğreneceğiniz temel kavramları ve konuları tanıyacaksınız. İlk olarak konunun genel çerçevesini çizerek başlayacağız.",
+                    duration: 5,
+                  },
+                  {
+                    id: "content-2",
+                    title: "Detaylı Açıklamalar",
+                    type: "video",
+                    content:
+                      "Konunun detaylarına inerek, pratik örnekler üzerinden açıklamalar yapacağız. Bu bölümde teorik bilgileri pratiğe dökmeyi öğreneceksiniz.",
+                    duration: 8,
+                  },
+                  {
+                    id: "content-3",
+                    title: "Uygulamalı Örnekler",
+                    type: "interactive",
+                    content:
+                      "Gerçek hayat örnekleri ile konuyu pekiştireceğiz. İnteraktif alıştırmalar ile öğrendiklerinizi test edebileceksiniz.",
+                    duration: 10,
+                  },
+                  {
+                    id: "content-4",
+                    title: "Özet ve Değerlendirme",
+                    type: "audio",
+                    content:
+                      "Modülün özetini yaparak önemli noktaları tekrar edeceğiz. Öğrendiklerinizi değerlendirme fırsatı bulacaksınız.",
+                    duration: 6,
+                  },
+                ],
+              }))
+              .sort((a: Module, b: Module) => getNumericId(a.id) - getNumericId(b.id)), // Modülleri id'ye göre sırala
+          }
+
+          setLearningPlan(updatedPlan)
           setUserData({
             learningGoal: activePlan.learningGoal,
             dailyTime: activePlan.dailyTime,
@@ -137,10 +217,20 @@ export default function MicroLearningPlatform() {
             targetLevel: activePlan.targetLevel,
           })
           setCurrentScreen("dashboard")
+        } else {
+          // Plan bulunamadı, sorulara git
+          setCurrentScreen("questions")
         }
+      } else {
+        // Plan yüklenirken hata oluştu, sorulara yönlendir
+        console.error("Plan yükleme hatası:", response.statusText)
+        setCurrentScreen("questions")
       }
     } catch (error) {
       console.error("Plan yükleme hatası:", error)
+      setCurrentScreen("questions") // Hata durumunda sorulara yönlendir
+    } finally {
+      setHasAttemptedPlanLoad(true) // Plan yükleme denemesi tamamlandı
     }
   }
 
@@ -236,7 +326,7 @@ export default function MicroLearningPlatform() {
         }
       }, 800)
 
-      const token = localStorage.getItem('access_token')
+      const token = localStorage.getItem("access_token")
       if (!token) {
         throw new Error("Kullanıcı oturumu bulunamadı")
       }
@@ -262,7 +352,9 @@ export default function MicroLearningPlatform() {
 
       await new Promise((resolve) => setTimeout(resolve, 500))
 
-      setLearningPlan(planData)
+      // Modülleri id'ye göre sırala
+      const sortedModules = planData.modules.sort((a: Module, b: Module) => getNumericId(a.id) - getNumericId(b.id))
+      setLearningPlan({ ...planData, modules: sortedModules })
       setCurrentScreen("dashboard")
     } catch (error) {
       console.error("Error generating plan:", error)
@@ -298,16 +390,61 @@ export default function MicroLearningPlatform() {
   }
 
   const handleModuleClick = (module: Module) => {
-    if (module.unlocked) {
+    if (module.unlocked || module.completed) {
       setCurrentModule(module)
-      setCurrentScreen("module")
+      setCurrentContentPage(0)
+      setViewedContentPages(new Set([0]))
+      setModuleProgress(0)
+      setCurrentScreen("module-content")
     }
+  }
+
+  const handleContentNext = () => {
+    if (currentModule && currentContentPage < currentModule.contentPages.length - 1) {
+      const nextPage = currentContentPage + 1
+      setCurrentContentPage(nextPage)
+      setViewedContentPages((prev) => new Set([...prev, nextPage]))
+
+      // Update progress based on viewed pages
+      const totalPages = currentModule.contentPages.length
+      const viewedCount = viewedContentPages.size + 1 // +1 for current page
+      const progress = (viewedCount / totalPages) * 100
+      setModuleProgress(progress)
+    } else {
+      // All content viewed, go to test
+      setCurrentScreen("module-test")
+    }
+  }
+
+  const handleContentPrevious = () => {
+    if (currentContentPage > 0) {
+      setCurrentContentPage(currentContentPage - 1)
+    }
+  }
+
+  const startModuleTest = () => {
+    setCurrentScreen("module-test")
+  }
+
+  const handleAnswerSelect = (answer: string) => {
+    setSelectedAnswer(answer)
+  }
+
+  const submitTest = () => {
+    // Simulate test evaluation
+    const isCorrect = Math.random() > 0.5 // Random for demo
+    if (isCorrect) {
+      setCorrectAnswers((prev) => prev + 1)
+    } else {
+      setWrongAnswers((prev) => prev + 1)
+    }
+    setCurrentScreen("module-complete")
   }
 
   const completeModule = async () => {
     if (currentModule && learningPlan) {
       try {
-        const token = localStorage.getItem('access_token')
+        const token = localStorage.getItem("access_token")
         if (!token) return
 
         // Save feedback if provided
@@ -357,6 +494,12 @@ export default function MicroLearningPlatform() {
         setCurrentScreen("dashboard")
         setCurrentModule(null)
         setFeedback("")
+        setCorrectAnswers(0)
+        setWrongAnswers(0)
+        setSelectedAnswer("")
+        setCurrentContentPage(0)
+        setViewedContentPages(new Set())
+        setModuleProgress(0)
       } catch (error) {
         console.error("Modül tamamlama hatası:", error)
       }
@@ -365,7 +508,6 @@ export default function MicroLearningPlatform() {
 
   const regeneratePlan = async () => {
     setShowRegenerateDialog(false)
-    // For now, just redirect to questions to create a new plan
     setCurrentScreen("questions")
     setCurrentQuestion(0)
   }
@@ -384,23 +526,44 @@ export default function MicroLearningPlatform() {
     }
   }
 
-  const getModuleGradient = (type: string, completed: boolean, unlocked: boolean) => {
-    if (completed) return "from-emerald-500 to-teal-500"
-    if (!unlocked) return "from-slate-400 to-slate-500"
-
+  const getContentIcon = (type: string) => {
     switch (type) {
-      case "quiz":
-        return "from-violet-500 to-purple-500"
-      case "exam":
-        return "from-amber-500 to-orange-500"
+      case "video":
+        return <FiVideo className="w-5 h-5" />
+      case "audio":
+        return <FiHeadphones className="w-5 h-5" />
+      case "interactive":
+        return <FiPlay className="w-5 h-5" />
       default:
-        return "from-sky-500 to-blue-500"
+        return <FiFileText className="w-5 h-5" />
     }
   }
 
-  // If user is logged in but no plan, show questions
-  if (user && !learningPlan && currentScreen === "welcome") {
-    setCurrentScreen("questions")
+  const getContentTypeLabel = (type: string) => {
+    switch (type) {
+      case "video":
+        return "Video İçerik"
+      case "audio":
+        return "Ses İçeriği"
+      case "interactive":
+        return "İnteraktif İçerik"
+      default:
+        return "Metin İçeriği"
+    }
+  }
+
+  // Genel yükleme ekranı
+  if (currentScreen === "loading" && !hasAttemptedPlanLoad) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md bg-white/10 backdrop-blur-xl border-white/20 text-white shadow-2xl">
+          <CardContent className="p-6 text-center">
+            <h2 className="text-2xl font-bold mb-2">Yükleniyor...</h2>
+            <p className="text-white/80">Lütfen bekleyin.</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   if (currentScreen === "welcome") {
@@ -537,7 +700,7 @@ export default function MicroLearningPlatform() {
                       placeholder={currentQ.placeholder}
                       value={userData[currentQ.field]}
                       onChange={(e) => setUserData({ ...userData, [currentQ.field]: e.target.value })}
-                      className="bg-white/10 border-white/20 text-white placeholder:text-white/50 h-14 text-lg rounded-xl focus:ring-2 focus:ring-white/30 transition-all duration-300"
+                      className="input-modern text-white placeholder:text-white/50 h-14 text-lg"
                     />
                   </div>
                 ) : (
@@ -545,7 +708,7 @@ export default function MicroLearningPlatform() {
                     value={userData[currentQ.field]}
                     onValueChange={(value) => setUserData({ ...userData, [currentQ.field]: value })}
                   >
-                    <SelectTrigger className="bg-white/10 border-white/20 text-white h-14 text-lg rounded-xl focus:ring-2 focus:ring-white/30">
+                    <SelectTrigger className="input-modern text-white h-14 text-lg">
                       <SelectValue placeholder="Seçiniz..." />
                     </SelectTrigger>
                     <SelectContent className="bg-white/95 backdrop-blur-xl border-white/20">
@@ -570,8 +733,8 @@ export default function MicroLearningPlatform() {
                 <Button
                   onClick={handlePrevious}
                   disabled={currentQuestion === 0}
-                  variant="outline"
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 px-6 py-3 rounded-xl transition-all duration-300 disabled:opacity-50"
+                  variant="outline-modern" // Yeni varyantı kullan
+                  className="px-6 py-3 rounded-xl disabled:opacity-50"
                 >
                   <FiArrowLeft className="w-4 h-4 mr-2" />
                   Geri
@@ -579,7 +742,8 @@ export default function MicroLearningPlatform() {
                 <Button
                   onClick={handleNext}
                   disabled={!userData[currentQ.field]}
-                  className="bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+                  variant="modern" // Yeni varyantı kullan
+                  className="px-6 py-3 rounded-xl disabled:opacity-50 disabled:hover:scale-100"
                 >
                   {currentQuestion === questions.length - 1 ? (
                     <>
@@ -614,9 +778,7 @@ export default function MicroLearningPlatform() {
           <CardContent className="p-10 text-center">
             <div className="mb-8">
               <div className="relative w-20 h-20 mx-auto mb-6">
-                <div className="absolute inset-0 rounded-full border-4 border-white/20"></div>
-                <div className="absolute inset-0 rounded-full border-4 border-yellow-300 border-t-transparent animate-spin"></div>
-                <div className="absolute inset-2 rounded-full bg-gradient-to-br from-yellow-300/20 to-orange-300/20 animate-pulse"></div>
+                <div className="spinner-modern"></div> {/* Modern spinner sınıfı */}
               </div>
               <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-white to-yellow-200 bg-clip-text text-transparent">
                 {loadingText}
@@ -640,267 +802,302 @@ export default function MicroLearningPlatform() {
     const totalCount = learningPlan.modules.length
     const progressPercentage = (completedCount / totalCount) * 100
 
-    // Create sequential order - ensure proper progression
-    const sequentialModules = [...learningPlan.modules].sort((a, b) => {
-      // Extract numeric part from id for proper ordering
-      const getNumericId = (id: string) => {
-        const match = id.match(/\d+/)
-        return match ? Number.parseInt(match[0]) : 0
-      }
-      return getNumericId(a.id) - getNumericId(b.id)
-    })
+    // Modüller zaten setLearningPlan içinde sıralanmış olduğu için burada tekrar sıralamaya gerek yok.
+    const sequentialModules = learningPlan.modules
 
     // Find current active module (first unlocked but not completed)
     const currentActiveModule = sequentialModules.find((m) => m.unlocked && !m.completed)
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-400 via-cyan-500 to-blue-600 font-inter">
-        {/* Fixed Header */}
-        <div className="sticky top-0 z-50 bg-white/10 backdrop-blur-xl border-b border-white/20">
-          <div className="max-w-4xl mx-auto p-6">
-            {/* User Info and Logout */}
-            <div className="flex justify-between items-center mb-6">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-full flex items-center justify-center">
-                  <span className="text-white font-semibold text-sm">
-                    {user?.full_name?.charAt(0) || 'U'}
-                  </span>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 font-inter">
+        {/* Modern Header */}
+        <div className="bg-white/80 backdrop-blur-xl border-b border-slate-200/50 sticky top-0 z-50">
+          <div className="max-w-6xl mx-auto px-6 py-4">
+            <div className="flex items-center justify-between">
+              {/* Logo & Title */}
+              <div className="flex items-center space-x-4">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <FiBookOpen className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <p className="text-white/90 text-sm">Hoş geldin,</p>
-                  <p className="text-white font-semibold">{user?.full_name || 'Kullanıcı'}</p>
+                  <h1 className="text-xl font-bold text-slate-800">Mikro Öğrenme</h1>
+                  <p className="text-sm text-slate-500">Kişisel gelişim platformu</p>
                 </div>
               </div>
-              <Button
-                onClick={signOut}
-                variant="outline"
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20 px-4 py-2 rounded-xl transition-all duration-300"
-              >
-                <FiLogIn className="w-4 h-4 mr-2" />
-                Çıkış Yap
-              </Button>
-            </div>
 
-            <div className="text-center mb-6">
-              <h1 className="text-3xl font-bold text-white mb-4 bg-gradient-to-r from-white to-cyan-200 bg-clip-text text-transparent">
-                {learningPlan.title}
-              </h1>
-            </div>
-
-            {/* Progress Stats */}
-            <div className="flex justify-center items-center space-x-6 mb-4">
-              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20 text-center">
-                <div className="text-2xl font-bold text-white">{completedCount}</div>
-                <div className="text-white/70 text-sm">Tamamlanan</div>
+              {/* User Profile */}
+              <div className="flex items-center space-x-4">
+                <div className="text-right">
+                  <p className="text-sm font-medium text-slate-700">{user?.full_name || "Kullanıcı"}</p>
+                  <p className="text-xs text-slate-500">Öğrenci</p>
+                </div>
+                <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-blue-500 rounded-full flex items-center justify-center shadow-lg">
+                  <span className="text-white font-semibold text-sm">{user?.full_name?.charAt(0) || "U"}</span>
+                </div>
+                <Button
+                  onClick={signOut}
+                  variant="ghost"
+                  size="sm"
+                  className="text-slate-600 hover:text-slate-800 hover:bg-slate-100"
+                >
+                  <FiLogIn className="w-4 h-4" />
+                </Button>
               </div>
-              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20 text-center">
-                <div className="text-2xl font-bold text-white">{totalCount - completedCount}</div>
-                <div className="text-white/70 text-sm">Kalan</div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20 text-center">
-                <div className="text-2xl font-bold text-white">{Math.round(progressPercentage)}%</div>
-                <div className="text-white/70 text-sm">İlerleme</div>
-              </div>
-            </div>
-
-            {/* Overall Progress Bar */}
-            <div className="max-w-md mx-auto mb-4">
-              <div className="relative bg-white/20 rounded-full h-3 overflow-hidden">
-                <div
-                  className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-full h-3 transition-all duration-1000 ease-out"
-                  style={{ width: `${progressPercentage}%` }}
-                ></div>
-              </div>
-            </div>
-
-            <div className="flex justify-center">
-              <Button
-                onClick={() => setShowRegenerateDialog(true)}
-                variant="outline"
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20 px-6 py-3 rounded-xl transition-all duration-300 transform hover:scale-105"
-              >
-                <FiRotateCcw className="w-4 h-4 mr-2" />
-                Planı Yeniden Oluştur
-              </Button>
             </div>
           </div>
         </div>
 
-        {/* Scrollable Content */}
-        <div className="max-w-4xl mx-auto p-6 pb-20">
-          {/* Learning Path Header */}
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-white mb-2">Öğrenme Yolculuğun</h2>
-            <p className="text-white/80">Sırayla ilerleyerek hedefine ulaş</p>
+        <div className="max-w-6xl mx-auto px-6 py-8">
+          {/* Welcome Section */}
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold text-slate-800 mb-2">
+              Hoş geldin, {user?.full_name?.split(" ")[0] || "Öğrenci"}! 👋
+            </h2>
+            <p className="text-slate-600 text-lg">{learningPlan.title}</p>
           </div>
 
-          {/* Sequential Course Path */}
-          <div className="relative">
-            {/* Progress Line */}
-            <div className="absolute left-8 top-8 bottom-8 w-1 bg-gradient-to-b from-white/30 via-white/20 to-white/10 rounded-full"></div>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-600">Toplam Modül</p>
+                  <p className="text-2xl font-bold text-slate-800">{totalCount}</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <FiBookOpen className="w-6 h-6 text-blue-600" />
+                </div>
+              </div>
+            </div>
 
-            {/* Completed Progress Line */}
-            <div
-              className="absolute left-8 top-8 w-1 bg-gradient-to-b from-emerald-400 to-cyan-400 rounded-full transition-all duration-1000 ease-out"
-              style={{
-                height: `${(completedCount / totalCount) * 100}%`,
-                maxHeight: "calc(100% - 4rem)",
-              }}
-            ></div>
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-600">Tamamlanan</p>
+                  <p className="text-2xl font-bold text-emerald-600">{completedCount}</p>
+                </div>
+                <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
+                  <FiCheckCircle className="w-6 h-6 text-emerald-600" />
+                </div>
+              </div>
+            </div>
 
-            <div className="space-y-6">
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-600">Kalan</p>
+                  <p className="text-2xl font-bold text-amber-600">{totalCount - completedCount}</p>
+                </div>
+                <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
+                  <FiClock className="w-6 h-6 text-amber-600" />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-600">İlerleme</p>
+                  <p className="text-2xl font-bold text-purple-600">{Math.round(progressPercentage)}%</p>
+                </div>
+                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                  <FiTrendingUp className="w-6 h-6 text-purple-600" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Progress Overview */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/50 mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-800">Genel İlerleme</h3>
+              <Button
+                onClick={() => setShowRegenerateDialog(true)}
+                variant="outline-modern" // Yeni varyantı kullan
+                size="sm"
+                className="px-4 py-2"
+              >
+                <FiRotateCcw className="w-4 h-4 mr-2" />
+                Yeni Plan
+              </Button>
+            </div>
+            <div className="relative">
+              <div className="w-full bg-slate-200 rounded-full h-3">
+                <div
+                  className="bg-gradient-to-r from-blue-500 to-purple-600 h-3 rounded-full transition-all duration-1000 ease-out"
+                  style={{ width: `${progressPercentage}%` }}
+                ></div>
+              </div>
+              <p className="text-sm text-slate-600 mt-2">
+                {completedCount} / {totalCount} modül tamamlandı
+              </p>
+            </div>
+          </div>
+
+          {/* Modules Grid */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-semibold text-slate-800">Öğrenme Modülleri</h3>
+              <div className="flex items-center space-x-2 text-sm text-slate-500">
+                <div className="flex items-center space-x-1">
+                  <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
+                  <span>Tamamlandı</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                  <span>Aktif</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <div className="w-3 h-3 bg-slate-300 rounded-full"></div>
+                  <span>Kilitli</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4">
               {sequentialModules.map((module, index) => {
                 const isActive = currentActiveModule?.id === module.id
                 const isLocked = !module.unlocked
                 const isCompleted = module.completed
+                const canReopen = module.completed // Tamamlanan modüller tekrar açılabilir
 
                 return (
                   <div
                     key={module.id}
-                    className={`relative transition-all duration-500 ${
-                      module.unlocked ? "hover:scale-[1.02] cursor-pointer" : ""
+                    className={`group relative bg-white rounded-2xl p-6 shadow-sm border transition-all duration-300 cursor-pointer ${
+                      isCompleted
+                        ? "border-emerald-200 hover:border-emerald-300 hover:shadow-md"
+                        : isActive
+                          ? "border-blue-200 hover:border-blue-300 hover:shadow-md ring-2 ring-blue-100"
+                          : isLocked
+                            ? "border-slate-200 opacity-60 cursor-not-allowed"
+                            : "border-slate-200 hover:border-slate-300 hover:shadow-md"
                     }`}
-                    onClick={() => handleModuleClick(module)}
+                    onClick={() => (module.unlocked || canReopen) && handleModuleClick(module)}
                   >
-                    {/* Connection Node */}
-                    <div className="absolute left-6 top-6 z-10">
-                      <div
-                        className={`w-6 h-6 rounded-full border-4 transition-all duration-500 ${
-                          isCompleted
-                            ? "bg-emerald-400 border-emerald-300 shadow-lg shadow-emerald-400/50"
-                            : isActive
-                              ? "bg-cyan-400 border-cyan-300 shadow-lg shadow-cyan-400/50 animate-pulse"
-                              : isLocked
-                                ? "bg-slate-400 border-slate-300"
-                                : "bg-white/50 border-white/70"
-                        }`}
-                      >
-                        {isCompleted && <FiCheckCircle className="w-4 h-4 text-white absolute -top-0.5 -left-0.5" />}
+                    <div className="flex items-center space-x-4">
+                      {/* Module Number & Status */}
+                      <div className="relative">
+                        <div
+                          className={`w-14 h-14 rounded-xl flex items-center justify-center text-lg font-bold transition-all duration-300 ${
+                            isCompleted
+                              ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/25"
+                              : isActive
+                                ? "bg-blue-500 text-white shadow-lg shadow-blue-500/25"
+                                : isLocked
+                                  ? "bg-slate-200 text-slate-400"
+                                  : "bg-slate-100 text-slate-600 group-hover:bg-slate-200"
+                          }`}
+                        >
+                          {isCompleted ? (
+                            <FiCheckCircle className="w-6 h-6" />
+                          ) : isLocked ? (
+                            <FiCircle className="w-6 h-6" />
+                          ) : (
+                            <span>{index + 1}</span>
+                          )}
+                        </div>
+                        {isActive && (
+                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full animate-pulse"></div>
+                        )}
+                      </div>
+
+                      {/* Module Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-3 mb-1">
+                          <h4 className="text-lg font-semibold text-slate-800 truncate">{module.title}</h4>
+                          <Badge
+                            variant="secondary"
+                            className={`badge-modern ${
+                              // badge-modern sınıfını kullan
+                              module.type === "quiz"
+                                ? "bg-purple-500 text-white" // Doğrudan renkleri kullan
+                                : module.type === "exam"
+                                  ? "bg-amber-500 text-white"
+                                  : "bg-blue-500 text-white"
+                            }`}
+                          >
+                            {module.type === "quiz" ? "Quiz" : module.type === "exam" ? "Sınav" : "Ders"}
+                          </Badge>
+                        </div>
+                        <p className="text-slate-600 text-sm line-clamp-2 mb-2">{module.description}</p>
+
+                        {/* Status Text */}
+                        <div className="flex items-center space-x-4 text-sm">
+                          {isCompleted && (
+                            <div className="flex items-center space-x-1 text-emerald-600">
+                              <FiCheckCircle className="w-4 h-4" />
+                              <span className="font-medium">Tamamlandı - Tekrar Aç</span>
+                            </div>
+                          )}
+                          {isActive && (
+                            <div className="flex items-center space-x-1 text-blue-600">
+                              <FiPlay className="w-4 h-4" />
+                              <span className="font-medium">Devam Et</span>
+                            </div>
+                          )}
+                          {isLocked && (
+                            <div className="flex items-center space-x-1 text-slate-400">
+                              <FiCircle className="w-4 h-4" />
+                              <span>Kilitli</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action Arrow */}
+                      <div className="flex-shrink-0">
+                        {(module.unlocked || canReopen) && (
+                          <FiArrowRight
+                            className={`w-5 h-5 transition-all duration-300 group-hover:translate-x-1 ${
+                              isCompleted ? "text-emerald-500" : isActive ? "text-blue-500" : "text-slate-400"
+                            }`}
+                          />
+                        )}
                       </div>
                     </div>
 
-                    <Card
-                      className={`ml-16 transition-all duration-300 ${
-                        isCompleted
-                          ? "bg-emerald-500/10 border-emerald-400/30 shadow-lg shadow-emerald-400/10"
-                          : isActive
-                            ? "bg-cyan-500/10 border-cyan-400/30 shadow-lg shadow-cyan-400/20 ring-2 ring-cyan-400/30"
-                            : isLocked
-                              ? "bg-slate-500/10 border-slate-400/20 opacity-60"
-                              : "bg-white/10 border-white/20"
-                      } backdrop-blur-xl hover:shadow-2xl`}
-                    >
-                      <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4 flex-1">
-                            {/* Module Icon */}
-                            <div className="relative">
-                              <div
-                                className={`w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br ${getModuleGradient(module.type, module.completed, module.unlocked)} backdrop-blur-sm border-2 border-white/30 shadow-lg transition-all duration-300`}
-                              >
-                                {getModuleIcon(module.type, module.completed, module.unlocked)}
-                              </div>
-                            </div>
-
-                            {/* Module Content */}
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-3 mb-2">
-                                <h3
-                                  className={`text-xl font-semibold ${
-                                    isCompleted ? "text-emerald-100" : isActive ? "text-cyan-100" : "text-white"
-                                  }`}
-                                >
-                                  {module.title}
-                                </h3>
-                                <Badge
-                                  variant="secondary"
-                                  className={`text-xs px-3 py-1 rounded-full ${
-                                    module.type === "quiz"
-                                      ? "bg-violet-500/20 text-violet-200 border border-violet-400/30"
-                                      : module.type === "exam"
-                                        ? "bg-amber-500/20 text-amber-200 border border-amber-400/30"
-                                        : "bg-sky-500/20 text-sky-200 border border-sky-400/30"
-                                  }`}
-                                >
-                                  {module.type === "quiz" ? "Quiz" : module.type === "exam" ? "Sınav" : "Ders"}
-                                </Badge>
-                              </div>
-                              <p
-                                className={`text-sm leading-relaxed ${
-                                  isCompleted ? "text-emerald-200/80" : isActive ? "text-cyan-200/80" : "text-white/80"
-                                }`}
-                              >
-                                {module.description}
-                              </p>
-
-                              {/* Status Indicators */}
-                              <div className="mt-3 flex items-center space-x-4">
-                                {isCompleted && (
-                                  <div className="flex items-center space-x-2">
-                                    <FiCheckCircle className="w-4 h-4 text-emerald-400" />
-                                    <span className="text-emerald-400 text-sm font-medium">Tamamlandı</span>
-                                  </div>
-                                )}
-                                {isActive && (
-                                  <div className="flex items-center space-x-2">
-                                    <FiPlay className="w-4 h-4 text-cyan-400" />
-                                    <span className="text-cyan-400 text-sm font-medium">Şimdi başla</span>
-                                  </div>
-                                )}
-                                {isLocked && (
-                                  <div className="flex items-center space-x-2">
-                                    <FiCircle className="w-4 h-4 text-slate-400" />
-                                    <span className="text-slate-400 text-sm font-medium">Kilitli</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Action Indicator */}
-                          <div className="ml-4">
-                            {module.unlocked && (
-                              <FiArrowRight
-                                className={`w-6 h-6 transition-all duration-300 ${
-                                  isCompleted ? "text-emerald-400" : isActive ? "text-cyan-400" : "text-white/60"
-                                }`}
-                              />
-                            )}
-                          </div>
+                    {/* Progress Bar for Active Module */}
+                    {isActive && (
+                      <div className="mt-4 pt-4 border-t border-slate-100">
+                        <div className="flex items-center justify-between text-sm text-slate-600 mb-2">
+                          <span>Modül İlerlemesi</span>
+                          <span>Başlamaya hazır</span>
                         </div>
-
-                        {/* Module Progress for Active Module */}
-                        {isActive && (
-                          <div className="mt-4 pt-4 border-t border-cyan-400/20">
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-cyan-200">Başlamaya hazır</span>
-                              <div className="flex items-center space-x-2">
-                                <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></div>
-                                <span className="text-cyan-300 font-medium">Devam et</span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
+                        <div className="w-full bg-slate-100 rounded-full h-2">
+                          <div className="bg-blue-500 h-2 rounded-full w-0 transition-all duration-300"></div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )
               })}
             </div>
           </div>
 
-          {/* Completion Message */}
+          {/* Completion Celebration */}
           {completedCount === totalCount && (
-            <div className="mt-12 text-center">
-              <Card className="bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 backdrop-blur-xl border-emerald-400/30 shadow-2xl">
-                <CardContent className="p-8">
-                  <FiAward className="w-16 h-16 mx-auto text-yellow-400 mb-4" />
-                  <h3 className="text-2xl font-bold text-white mb-2">Tebrikler! 🎉</h3>
-                  <p className="text-white/80 text-lg">
+            <div className="mt-12">
+              <div className="bg-gradient-to-r from-emerald-50 to-blue-50 rounded-2xl p-8 border border-emerald-200">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <FiAward className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-800 mb-2">Tebrikler! 🎉</h3>
+                  <p className="text-slate-600 text-lg mb-4">
                     Tüm modülleri başarıyla tamamladın. Öğrenme yolculuğun harika geçti!
                   </p>
-                </CardContent>
-              </Card>
+                  <div className="flex justify-center space-x-4">
+                    <Button
+                      onClick={() => setShowRegenerateDialog(true)}
+                      variant="modern" // Yeni varyantı kullan
+                      className="px-6 py-3 rounded-xl"
+                    >
+                      Yeni Plan Oluştur
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -908,126 +1105,395 @@ export default function MicroLearningPlatform() {
     )
   }
 
-  if (currentScreen === "module" && currentModule) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-rose-400 via-pink-500 to-purple-600 p-4 overflow-hidden relative font-inter">
-        {/* Animated background */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute top-20 left-20 w-40 h-40 bg-white/10 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-20 right-20 w-32 h-32 bg-white/10 rounded-full blur-2xl animate-pulse delay-1000"></div>
-        </div>
+  // Module Content Screen - Modern Design
+  if (currentScreen === "module-content" && currentModule) {
+    const currentContent = currentModule.contentPages[currentContentPage]
+    const totalPages = currentModule.contentPages.length
+    const contentProgress = (viewedContentPages.size / totalPages) * 100
 
-        <div className="max-w-4xl mx-auto relative z-10">
-          <Card className="bg-white/10 backdrop-blur-xl border-white/20 text-white shadow-2xl">
-            <CardContent className="p-10">
-              {/* Module Header */}
-              <div className="text-center mb-10">
-                <div className="relative mb-6">
-                  <div
-                    className={`w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br ${getModuleGradient(currentModule.type, false, true)} p-5 shadow-xl`}
-                  >
-                    {getModuleIcon(currentModule.type, false, true)}
-                  </div>
-                  <div className="absolute inset-0 w-20 h-20 mx-auto bg-white/20 rounded-3xl blur-xl"></div>
-                </div>
-                <h1 className="text-3xl font-bold mb-3 bg-gradient-to-r from-white to-pink-200 bg-clip-text text-transparent">
-                  {currentModule.title}
-                </h1>
-                <p className="text-white/80 text-lg leading-relaxed max-w-2xl mx-auto">{currentModule.description}</p>
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 font-inter">
+        {/* Modern Header */}
+        <div className="bg-white/80 backdrop-blur-xl border-b border-slate-200/50 sticky top-0 z-50">
+          <div className="max-w-4xl mx-auto px-6 py-4">
+            <div className="flex items-center justify-between">
+              <Button
+                onClick={() => setCurrentScreen("dashboard")}
+                variant="outline-modern" // Yeni varyantı kullan
+                className="px-4 py-2"
+              >
+                <FiArrowLeft className="w-4 h-4 mr-2" />
+                Dashboard
+              </Button>
+
+              <div className="text-center">
+                <h1 className="text-xl font-bold text-slate-800">{currentModule.title}</h1>
+                <p className="text-sm text-slate-500">İçerik Sayfası</p>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-8 mb-10">
-                {/* Objectives */}
-                <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
-                  <h3 className="text-xl font-semibold mb-4 flex items-center">
-                    <FiTarget className="w-5 h-5 mr-2 text-green-400" />
-                    Hedef Kazanımlar
-                  </h3>
-                  <ul className="space-y-3">
-                    {currentModule.objectives.map((objective, index) => (
-                      <li key={index} className="flex items-start">
-                        <FiCheckCircle className="w-5 h-5 mr-3 text-emerald-400 flex-shrink-0 mt-0.5" />
-                        <span className="text-white/90">{objective}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+              <div className="flex items-center space-x-2 text-sm text-slate-600">
+                <FiEye className="w-4 h-4" />
+                <span>
+                  {currentContentPage + 1} / {totalPages}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
 
-                {/* Resources */}
-                {currentModule.resources.length > 0 && (
-                  <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
-                    <h3 className="text-xl font-semibold mb-4 flex items-center">
-                      <FiBookmark className="w-5 h-5 mr-2 text-blue-400" />
-                      Kaynaklar
-                    </h3>
-                    <ul className="space-y-3">
-                      {currentModule.resources.map((resource, index) => (
-                        <li key={index} className="flex items-start">
-                          <FiPlay className="w-5 h-5 mr-3 text-sky-400 flex-shrink-0 mt-0.5" />
-                          <span className="text-white/90">{resource}</span>
-                        </li>
-                      ))}
-                    </ul>
+        <div className="max-w-4xl mx-auto px-6 py-8">
+          {/* Progress Section */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/50 mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-800">İçerik İlerlemesi</h3>
+              <span className="text-sm text-slate-600">{Math.round(contentProgress)}% Tamamlandı</span>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-3">
+              <div
+                className="bg-gradient-to-r from-blue-500 to-purple-600 h-3 rounded-full transition-all duration-1000 ease-out"
+                style={{ width: `${contentProgress}%` }}
+              ></div>
+            </div>
+            <div className="flex justify-between mt-2 text-xs text-slate-500">
+              <span>Başlangıç</span>
+              <span>Tamamlandı</span>
+            </div>
+          </div>
+
+          {/* Content Card */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/50 overflow-hidden mb-8">
+            {/* Content Header */}
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 px-8 py-6 border-b border-slate-200/50">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white">
+                  {getContentIcon(currentContent.type)}
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-800">{currentContent.title}</h2>
+                  <div className="flex items-center space-x-4 mt-2">
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                      {getContentTypeLabel(currentContent.type)}
+                    </Badge>
+                    <div className="flex items-center space-x-1 text-sm text-slate-600">
+                      <FiClock className="w-4 h-4" />
+                      <span>{currentContent.duration} dakika</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Content Body */}
+            <div className="p-8">
+              <div className="prose prose-slate max-w-none">
+                <p className="text-lg text-slate-700 leading-relaxed">{currentContent.content}</p>
+              </div>
+
+              {/* Content Type Specific Elements */}
+              {currentContent.type === "video" && (
+                <div className="mt-8 bg-slate-100 rounded-xl p-8 text-center">
+                  <FiVideo className="w-16 h-16 mx-auto text-slate-400 mb-4" />
+                  <p className="text-slate-600">Video içeriği burada görüntülenecek</p>
+                </div>
+              )}
+
+              {currentContent.type === "audio" && (
+                <div className="mt-8 bg-slate-100 rounded-xl p-8 text-center">
+                  <FiHeadphones className="w-16 h-16 mx-auto text-slate-400 mb-4" />
+                  <p className="text-slate-600">Ses içeriği burada çalınacak</p>
+                </div>
+              )}
+
+              {currentContent.type === "interactive" && (
+                <div className="mt-8 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-8 text-center border border-blue-200">
+                  <FiPlay className="w-16 h-16 mx-auto text-blue-500 mb-4" />
+                  <p className="text-slate-700 font-medium">İnteraktif içerik burada yer alacak</p>
+                  <Button variant="modern" className="mt-4">
+                    Etkileşimi Başlat
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Navigation */}
+          <div className="flex justify-between items-center">
+            <Button
+              onClick={handleContentPrevious}
+              disabled={currentContentPage === 0}
+              variant="outline-modern" // Yeni varyantı kullan
+              className="px-6 py-3 disabled:opacity-50"
+            >
+              <FiArrowLeft className="w-4 h-4 mr-2" />
+              Önceki İçerik
+            </Button>
+
+            <div className="flex items-center space-x-2">
+              {currentModule.contentPages.map((_, index) => (
+                <div
+                  key={index}
+                  className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                    index === currentContentPage
+                      ? "bg-blue-500 scale-125"
+                      : viewedContentPages.has(index)
+                        ? "bg-emerald-500"
+                        : "bg-slate-300"
+                  }`}
+                />
+              ))}
+            </div>
+
+            <Button
+              onClick={handleContentNext}
+              variant="modern" // Yeni varyantı kullan
+              className="px-6 py-3"
+            >
+              {currentContentPage === totalPages - 1 ? (
+                <>
+                  Teste Geç
+                  <FiArrowRight className="w-4 h-4 ml-2" />
+                </>
+              ) : (
+                <>
+                  Sonraki İçerik
+                  <FiArrowRight className="w-4 h-4 ml-2" />
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Module Test Screen - Modern Design
+  if (currentScreen === "module-test" && currentModule) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 font-inter">
+        {/* Modern Header */}
+        <div className="bg-white/80 backdrop-blur-xl border-b border-slate-200/50 sticky top-0 z-50">
+          <div className="max-w-4xl mx-auto px-6 py-4">
+            <div className="flex items-center justify-between">
+              <Button
+                onClick={() => setCurrentScreen("module-content")}
+                variant="outline-modern" // Yeni varyantı kullan
+                className="px-4 py-2"
+              >
+                <FiArrowLeft className="w-4 h-4 mr-2" />
+                İçeriğe Dön
+              </Button>
+
+              <div className="text-center">
+                <h1 className="text-xl font-bold text-slate-800">{currentModule.title}</h1>
+                <p className="text-sm text-slate-500">Değerlendirme Testi</p>
+              </div>
+
+              <div className="flex items-center space-x-2 text-sm text-slate-600">
+                <FaBrain className="w-4 h-4" />
+                <span>Test</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-4xl mx-auto px-6 py-8">
+          {/* Test Card */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/50 overflow-hidden">
+            {/* Test Header */}
+            <div className="bg-gradient-to-r from-purple-50 to-pink-50 px-8 py-6 border-b border-slate-200/50">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-white">
+                  <FaBrain className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-800">Değerlendirme Sorusu</h2>
+                  <p className="text-slate-600 mt-1">Öğrendiklerinizi test edin</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Test Content */}
+            <div className="p-8">
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-slate-800 mb-6 leading-relaxed">
+                  {currentModule.quiz.question}
+                </h3>
+
+                {currentModule.quiz.type === "multiple" && currentModule.quiz.options ? (
+                  <div className="space-y-4">
+                    {currentModule.quiz.options.map((option, index) => (
+                      <div
+                        key={index}
+                        onClick={() => handleAnswerSelect(option)}
+                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 ${
+                          selectedAnswer === option
+                            ? "border-blue-500 bg-blue-50 shadow-md"
+                            : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className="flex items-center space-x-4">
+                          <div
+                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-sm font-semibold ${
+                              selectedAnswer === option
+                                ? "border-blue-500 bg-blue-500 text-white"
+                                : "border-slate-300 text-slate-500"
+                            }`}
+                          >
+                            {String.fromCharCode(65 + index)}
+                          </div>
+                          <span className="text-slate-700 font-medium">{option}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <Textarea
+                      placeholder="Cevabınızı detaylı olarak yazın..."
+                      value={selectedAnswer}
+                      onChange={(e) => setSelectedAnswer(e.target.value)}
+                      className="input-modern min-h-32 resize-none" // input-modern sınıfını kullan
+                    />
+                    <p className="text-sm text-slate-500">
+                      Düşüncelerinizi ve öğrendiklerinizi açık bir şekilde ifade edin.
+                    </p>
                   </div>
                 )}
               </div>
 
-              {/* Assessment */}
-              <div className="bg-white/5 rounded-2xl p-8 border border-white/10 mb-8">
-                <h3 className="text-xl font-semibold mb-6 flex items-center">
-                  <FaBrain className="w-5 h-5 mr-2 text-violet-400" />
-                  Değerlendirme
-                </h3>
-                <div className="bg-white/5 rounded-xl p-6">
-                  <p className="mb-6 text-lg text-white/90">{currentModule.quiz.question}</p>
-                  {currentModule.quiz.type === "multiple" && currentModule.quiz.options ? (
-                    <div className="grid gap-3">
-                      {currentModule.quiz.options.map((option, index) => (
-                        <Button
-                          key={index}
-                          variant="outline"
-                          className="w-full justify-start bg-white/10 border-white/20 text-white hover:bg-white/20 p-4 h-auto text-left rounded-xl transition-all duration-300 transform hover:scale-[1.02]"
-                        >
-                          <div className="flex items-center">
-                            <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center mr-3 text-sm font-semibold">
-                              {String.fromCharCode(65 + index)}
-                            </div>
-                            {option}
-                          </div>
-                        </Button>
-                      ))}
-                    </div>
-                  ) : (
-                    <Textarea
-                      placeholder="Düşüncelerinizi ve deneyimlerinizi paylaşın..."
-                      value={feedback}
-                      onChange={(e) => setFeedback(e.target.value)}
-                      className="bg-white/10 border-white/20 text-white placeholder:text-white/50 min-h-32 rounded-xl focus:ring-2 focus:ring-white/30 transition-all duration-300"
-                    />
-                  )}
-                </div>
+              <div className="flex justify-center">
+                <Button
+                  onClick={submitTest}
+                  disabled={!selectedAnswer}
+                  variant="modern" // Yeni varyantı kullan
+                  className="px-8 py-3 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <FiCheckCircle className="w-5 h-5 mr-2" />
+                  Testi Tamamla
+                </Button>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
-              {/* Action Buttons */}
-              <div className="flex justify-between">
-                <Button
-                  onClick={() => setCurrentScreen("dashboard")}
-                  variant="outline"
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 px-8 py-4 rounded-xl transition-all duration-300 transform hover:scale-105"
-                >
-                  <FiArrowLeft className="w-4 h-4 mr-2" />
-                  Geri Dön
-                </Button>
-                <Button
-                  onClick={completeModule}
-                  className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-500 text-white px-8 py-4 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
-                >
-                  <FiCheckCircle className="w-4 h-4 mr-2" />
-                  Tamamla
-                </Button>
+  // Module Complete Screen - Modern Design
+  if (currentScreen === "module-complete" && currentModule) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 font-inter">
+        {/* Modern Header */}
+        <div className="bg-white/80 backdrop-blur-xl border-b border-slate-200/50 sticky top-0 z-50">
+          <div className="max-w-4xl mx-auto px-6 py-4">
+            <div className="text-center">
+              <h1 className="text-xl font-bold text-slate-800">{currentModule.title}</h1>
+              <p className="text-sm text-slate-500">Modül Tamamlandı</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-4xl mx-auto px-6 py-8">
+          {/* Completion Celebration */}
+          <div className="bg-gradient-to-r from-emerald-50 to-blue-50 rounded-2xl p-8 border border-emerald-200 mb-8">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FiAward className="w-8 h-8 text-white" />
               </div>
-            </CardContent>
-          </Card>
+              <h2 className="text-2xl font-bold text-slate-800 mb-2">Tebrikler! 🎉</h2>
+              <p className="text-slate-600 text-lg">Modülü başarıyla tamamladın!</p>
+            </div>
+          </div>
+
+          {/* Summary Cards */}
+          <div className="grid md:grid-cols-2 gap-6 mb-8">
+            {/* Objectives Summary */}
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/50">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                  <FiTarget className="w-5 h-5 text-emerald-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-slate-800">Kazanımlar</h3>
+              </div>
+              <ul className="space-y-3">
+                {currentModule.objectives.map((objective, index) => (
+                  <li key={index} className="flex items-start space-x-3">
+                    <FiCheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-700">{objective}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Resources Summary */}
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/50">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <FiBookmark className="w-5 h-5 text-blue-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-slate-800">Kaynaklar</h3>
+              </div>
+              <ul className="space-y-3">
+                {currentModule.resources.map((resource, index) => (
+                  <li key={index} className="flex items-start space-x-3">
+                    <FiPlay className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-700">{resource}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* Test Results */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/50 mb-8">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                <FaBrain className="w-5 h-5 text-purple-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-800">Test Sonuçları</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="text-center p-4 bg-emerald-50 rounded-xl border border-emerald-200">
+                <div className="text-3xl font-bold text-emerald-600 mb-1">{correctAnswers}</div>
+                <div className="text-sm text-emerald-700 font-medium">Doğru Cevap</div>
+              </div>
+              <div className="text-center p-4 bg-red-50 rounded-xl border border-red-200">
+                <div className="text-3xl font-bold text-red-600 mb-1">{wrongAnswers}</div>
+                <div className="text-sm text-red-700 font-medium">Yanlış Cevap</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Feedback Section */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/50 mb-8">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+                <FiStar className="w-5 h-5 text-amber-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-800">Değerlendirme</h3>
+            </div>
+            <Textarea
+              placeholder="Bu modül hakkında düşüncelerinizi, öğrendiklerinizi ve önerilerinizi paylaşın..."
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+              className="input-modern min-h-32 resize-none" // input-modern sınıfını kullan
+            />
+            <p className="text-sm text-slate-500 mt-2">
+              Geri bildiriminiz gelişimimize katkı sağlar ve diğer öğrenciler için faydalıdır.
+            </p>
+          </div>
+
+          {/* Complete Button */}
+          <div className="text-center">
+            <Button
+              onClick={completeModule}
+              variant="modern" // Yeni varyantı kullan
+              className="px-12 py-4 text-lg shadow-lg"
+            >
+              <FiCheckCircle className="w-6 h-6 mr-3" />
+              Modülü Tamamla ve Dashboard'a Dön
+            </Button>
+          </div>
         </div>
       </div>
     )
@@ -1046,7 +1512,8 @@ export default function MicroLearningPlatform() {
           <AlertDialogCancel className="bg-slate-100 hover:bg-slate-200 text-slate-800">İptal</AlertDialogCancel>
           <AlertDialogAction
             onClick={regeneratePlan}
-            className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white"
+            variant="modern" // Yeni varyantı kullan
+            className="text-white"
           >
             Evet, Yeniden Oluştur
           </AlertDialogAction>

@@ -135,4 +135,4 @@ export async function createUserProfile(userId: string, fullName: string, email:
     console.error('Error creating user profile:', error)
     return false
   }
-} 
+}

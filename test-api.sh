@@ -59,4 +59,4 @@ else
     echo "❌ Failed to extract access token"
 fi
 
-echo "✅ All tests completed!" 
+echo "✅ All tests completed!"

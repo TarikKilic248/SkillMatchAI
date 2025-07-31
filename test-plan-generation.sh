@@ -71,4 +71,4 @@ else
     echo "❌ Failed to extract access token"
 fi
 
-echo "✅ AI Plan Generation test completed!" 
+echo "✅ AI Plan Generation test completed!"
