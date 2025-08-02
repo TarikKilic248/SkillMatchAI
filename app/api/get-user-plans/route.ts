@@ -52,6 +52,14 @@ export async function GET(request: NextRequest) {
           }
         }
 
+        // Check if all modules are completed
+        const allModulesCompleted = modules.length > 0 && modules.every(module => module.completed)
+
+        // If all modules are completed, return null to filter out this plan
+        if (allModulesCompleted) {
+          return null
+        }
+
         // Transform modules to match frontend interface
         const transformedModules = modules.map((module, index) => ({
           id: module.id,
@@ -86,7 +94,10 @@ export async function GET(request: NextRequest) {
       }),
     )
 
-    return NextResponse.json({ plans: plansWithModules })
+    // Filter out null values (completed plans)
+    const activePlans = plansWithModules.filter(plan => plan !== null)
+
+    return NextResponse.json({ plans: activePlans })
   } catch (error) {
     console.error("Get user plans error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
