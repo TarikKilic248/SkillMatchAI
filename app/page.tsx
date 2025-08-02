@@ -39,6 +39,7 @@ import {
   FiFileText,
   FiVideo,
   FiHeadphones,
+  FiPlus,
 } from "react-icons/fi"
 import { FaBrain } from "react-icons/fa"
 import { useRouter } from "next/navigation"
@@ -218,7 +219,7 @@ export default function MicroLearningPlatform() {
           })
           setCurrentScreen("dashboard")
         } else {
-          // Plan bulunamadı, sorulara git
+          // Plan bulunamadı veya tüm modüller tamamlanmış, sorulara git
           setCurrentScreen("questions")
         }
       } else {
@@ -490,6 +491,9 @@ export default function MicroLearningPlatform() {
           updatedModules[currentIndex + 1].unlocked = true
         }
 
+        // Check if all modules are completed
+        const allModulesCompleted = updatedModules.every((m) => m.completed)
+
         setLearningPlan({ ...learningPlan, modules: updatedModules })
         setCurrentScreen("dashboard")
         setCurrentModule(null)
@@ -500,6 +504,12 @@ export default function MicroLearningPlatform() {
         setCurrentContentPage(0)
         setViewedContentPages(new Set())
         setModuleProgress(0)
+
+        // If all modules are completed, show completion message
+        if (allModulesCompleted) {
+          // Plan tamamlandı, kullanıcı dashboard'da tamamlama mesajını görecek
+          console.log("Tüm modüller tamamlandı!")
+        }
       } catch (error) {
         console.error("Modül tamamlama hatası:", error)
       }
@@ -508,6 +518,28 @@ export default function MicroLearningPlatform() {
 
   const regeneratePlan = async () => {
     setShowRegenerateDialog(false)
+    
+    // Deactivate current plan if it exists
+    if (learningPlan?.id) {
+      try {
+        const token = localStorage.getItem("access_token")
+        if (token) {
+          await fetch("/api/deactivate-plan", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              planId: learningPlan.id,
+            }),
+          })
+        }
+      } catch (error) {
+        console.error("Plan deactivation error:", error)
+      }
+    }
+    
     setCurrentScreen("questions")
     setCurrentQuestion(0)
   }
@@ -933,6 +965,84 @@ export default function MicroLearningPlatform() {
               </p>
             </div>
           </div>
+
+          {/* Completion Message */}
+          {completedCount === totalCount && totalCount > 0 && (
+            <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-2xl p-6 mb-8">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center">
+                  <FiAward className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-emerald-800 mb-2">
+                    Tebrikler! 🎉
+                  </h3>
+                  <p className="text-emerald-700 mb-4">
+                    Tüm modülleri başarıyla tamamladınız. Yeni bir öğrenme yolculuğuna başlamak ister misiniz?
+                  </p>
+                  <div className="flex space-x-3">
+                    <Button
+                      onClick={async () => {
+                        if (learningPlan?.id) {
+                          try {
+                            const token = localStorage.getItem("access_token")
+                            if (token) {
+                              await fetch("/api/deactivate-plan", {
+                                method: "POST",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                  Authorization: `Bearer ${token}`,
+                                },
+                                body: JSON.stringify({
+                                  planId: learningPlan.id,
+                                }),
+                              })
+                            }
+                          } catch (error) {
+                            console.error("Plan deactivation error:", error)
+                          }
+                        }
+                        setShowRegenerateDialog(true)
+                      }}
+                      className="bg-emerald-500 hover:bg-emerald-600 text-white"
+                    >
+                      <FiPlus className="w-4 h-4 mr-2" />
+                      Yeni Plan Oluştur
+                    </Button>
+                    <Button
+                      onClick={async () => {
+                        if (learningPlan?.id) {
+                          try {
+                            const token = localStorage.getItem("access_token")
+                            if (token) {
+                              await fetch("/api/deactivate-plan", {
+                                method: "POST",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                  Authorization: `Bearer ${token}`,
+                                },
+                                body: JSON.stringify({
+                                  planId: learningPlan.id,
+                                }),
+                              })
+                            }
+                          } catch (error) {
+                            console.error("Plan deactivation error:", error)
+                          }
+                        }
+                        setCurrentScreen("questions")
+                      }}
+                      variant="outline"
+                      className="border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                    >
+                      <FiRotateCcw className="w-4 h-4 mr-2" />
+                      Farklı Hedef Belirle
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Modules Grid */}
           <div className="space-y-6">
