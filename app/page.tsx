@@ -1,12 +1,18 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,7 +22,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
 import {
   FiBookOpen,
   FiClock,
@@ -40,200 +46,245 @@ import {
   FiVideo,
   FiHeadphones,
   FiPlus,
-} from "react-icons/fi"
-import { FaBrain } from "react-icons/fa"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@/lib/auth-context"
+} from "react-icons/fi";
+import { FaBrain } from "react-icons/fa";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
 
 interface UserData {
-  learningGoal: string
-  dailyTime: string
-  duration: string
-  learningStyle: string
-  targetLevel: string
+  learningGoal: string;
+  dailyTime: string;
+  duration: string;
+  learningStyle: string;
+  targetLevel: string;
 }
 
 interface ContentPage {
-  id: string
-  title: string
-  type: "text" | "video" | "audio" | "interactive"
-  content: string
-  duration: number // minutes
+  id: string;
+  title: string;
+  type: "text" | "video" | "audio" | "interactive";
+  content: string;
+  duration: number; // minutes
 }
 
 interface Module {
-  id: string
-  title: string
-  description: string
-  objectives: string[]
-  resources: string[]
-  contentPages: ContentPage[]
+  id: string;
+  title: string;
+  description: string;
+  objectives: string[];
+  resources: string[];
+  contentPages: ContentPage[];
   quiz: {
-    question: string
-    options?: string[]
-    type: "multiple" | "open"
-  }
-  completed: boolean
-  unlocked: boolean
-  position: { x: number; y: number }
-  type: "lesson" | "quiz" | "exam"
+    question: string;
+    options?: string[];
+    type: "multiple" | "open";
+  };
+  completed: boolean;
+  unlocked: boolean;
+  position: { x: number; y: number };
+  type: "lesson" | "quiz" | "exam";
 }
 
 interface LearningPlan {
-  id?: string
-  title: string
-  modules: Module[]
-  learningGoal?: string
-  dailyTime?: string
-  duration?: string
-  learningStyle?: string
-  targetLevel?: string
+  id?: string;
+  title: string;
+  modules: Module[];
+  learningGoal?: string;
+  dailyTime?: string;
+  duration?: string;
+  learningStyle?: string;
+  targetLevel?: string;
 }
 
 export default function MicroLearningPlatform() {
-  const { user, signOut, loading: authLoading } = useAuth()
+  const { user, signOut, loading: authLoading } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<
-    "welcome" | "questions" | "loading" | "dashboard" | "module" | "module-content" | "module-test" | "module-complete"
-  >("loading") // Başlangıçta genel bir yükleme durumu
-  const [currentQuestion, setCurrentQuestion] = useState(0)
+    | "welcome"
+    | "questions"
+    | "loading"
+    | "dashboard"
+    | "module"
+    | "module-content"
+    | "module-test"
+    | "module-complete"
+  >("loading"); // Başlangıçta genel bir yükleme durumu
+  const [currentQuestion, setCurrentQuestion] = useState(0);
   const [userData, setUserData] = useState<UserData>({
     learningGoal: "",
     dailyTime: "",
     duration: "",
     learningStyle: "",
     targetLevel: "",
-  })
-  const [learningPlan, setLearningPlan] = useState<LearningPlan | null>(null)
-  const [currentModule, setCurrentModule] = useState<Module | null>(null)
-  const [loadingProgress, setLoadingProgress] = useState(0)
-  const [loadingText, setLoadingText] = useState("Senin için program oluşturuyoruz...")
-  const [showRegenerateDialog, setShowRegenerateDialog] = useState(false)
-  const [feedback, setFeedback] = useState("")
-  const [slideDirection, setSlideDirection] = useState<"left" | "right">("right")
+  });
+  const [learningPlan, setLearningPlan] = useState<LearningPlan | null>(null);
+  const [currentModule, setCurrentModule] = useState<Module | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingText, setLoadingText] = useState(
+    "Senin için program oluşturuyoruz..."
+  );
+  const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const [slideDirection, setSlideDirection] = useState<"left" | "right">(
+    "right"
+  );
   const [userFeedbacks, setUserFeedbacks] = useState<
     Array<{
-      moduleId: string
-      feedback: string
-      timestamp: string
+      moduleId: string;
+      feedback: string;
+      timestamp: string;
     }>
-  >([])
-  const [isAnimating, setIsAnimating] = useState(false)
-  const [moduleProgress, setModuleProgress] = useState(0)
-  const [selectedAnswer, setSelectedAnswer] = useState<string>("")
-  const [correctAnswers, setCorrectAnswers] = useState(0)
-  const [wrongAnswers, setWrongAnswers] = useState(0)
-  const [currentContentPage, setCurrentContentPage] = useState(0)
-  const [viewedContentPages, setViewedContentPages] = useState<Set<number>>(new Set())
-  const [hasAttemptedPlanLoad, setHasAttemptedPlanLoad] = useState(false) // Plan yükleme denemesi yapıldı mı?
-  const router = useRouter()
+  >([]);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [moduleProgress, setModuleProgress] = useState(0);
+  const [selectedAnswer, setSelectedAnswer] = useState<string>("");
+  const [correctAnswers, setCorrectAnswers] = useState(0);
+  const [wrongAnswers, setWrongAnswers] = useState(0);
+  const [currentContentPage, setCurrentContentPage] = useState(0);
+  const [viewedContentPages, setViewedContentPages] = useState<Set<number>>(
+    new Set()
+  );
+  const [hasAttemptedPlanLoad, setHasAttemptedPlanLoad] = useState(false); // Plan yükleme denemesi yapıldı mı?
+  const router = useRouter();
 
   useEffect(() => {
     if (!authLoading) {
       // Sadece kimlik doğrulama durumu bilindiğinde devam et
       if (user) {
         // Kullanıcı giriş yapmış, planı yüklemeye çalış
-        loadUserPlans()
+        loadUserPlans();
       } else {
         // Kullanıcı yok, hoş geldin ekranına git
-        setCurrentScreen("welcome")
-        setHasAttemptedPlanLoad(true) // Giriş yapmamış kullanıcı için kontrol tamamlandı
+        setCurrentScreen("welcome");
+        setHasAttemptedPlanLoad(true); // Giriş yapmamış kullanıcı için kontrol tamamlandı
       }
     }
-  }, [user, authLoading]) // user ve authLoading değiştiğinde tetikle
+  }, [user, authLoading]); // user ve authLoading değiştiğinde tetikle
 
   const getNumericId = (id: string) => {
-    const match = id.match(/\d+/)
-    return match ? Number.parseInt(match[0]) : 0
+    const match = id.match(/\d+/);
+    return match ? Number.parseInt(match[0]) : 0;
+  };
+
+  const handleSignOut = async () => {
+  try {
+    // Önce localStorage'ı temizle
+    localStorage.removeItem('currentModules');
+    localStorage.removeItem('access_token');
+    
+    // Sonra state'leri sıfırla
+    setLearningPlan(null);
+    setCurrentModule(null);
+    setCurrentContentPage(0);
+    setViewedContentPages(new Set());
+    setModuleProgress(0);
+    
+    // En son çıkış yap
+    await signOut();
+    
+    // Welcome ekranına yönlendir
+    setCurrentScreen("welcome");
+  } catch (error) {
+    console.error("Çıkış yapılırken hata oluştu:", error);
   }
+};
 
   const loadUserPlans = async () => {
     try {
-      const token = localStorage.getItem("access_token")
+      const token = localStorage.getItem("access_token");
       if (!token) {
-        setCurrentScreen("welcome")
-        return
+        setCurrentScreen("welcome");
+        return;
+      }
+
+      // Önce local storage'dan mevcut modülleri kontrol et
+      const savedModules = localStorage.getItem("currentModules");
+      if (savedModules) {
+        const modules = JSON.parse(savedModules);
+        setLearningPlan((prev) => ({
+          ...prev,
+          modules: modules,
+        }));
+        setCurrentScreen("dashboard");
+        return;
       }
 
       const response = await fetch("/api/get-user-plans", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
-      })
+      });
 
       if (response.ok) {
-        const { plans } = await response.json()
+        const { plans } = await response.json();
         if (plans && plans.length > 0) {
-          const activePlan = plans[0] // En son aktif planı al
+          const activePlan = plans[0];
 
-          // Modüllere örnek içerik sayfaları ekle (varsa mevcutları koru) ve sırala
-          const updatedPlan = {
+          // Her modül için varsayılan içerik sayfalarını ekle
+          const modulesWithContent = activePlan.modules.map(
+            (module: Module, index: number) => ({
+              ...module,
+              unlocked: index === 0 ? true : module.unlocked,
+              contentPages: [
+                {
+                  id: `${module.id}-content-1`,
+                  title: "Giriş ve Temel Kavramlar",
+                  type: "text",
+                  content:
+                    "Bu modülde öğreneceğiniz temel kavramları ve konuları tanıyacaksınız.",
+                  duration: 5,
+                },
+                {
+                  id: `${module.id}-content-2`,
+                  title: "Detaylı Açıklamalar",
+                  type: "video",
+                  content:
+                    "Konunun detaylarına inerek, pratik örnekler üzerinden açıklamalar yapacağız.",
+                  duration: 8,
+                },
+                {
+                  id: `${module.id}-content-3`,
+                  title: "Uygulamalı Örnekler",
+                  type: "interactive",
+                  content: "Gerçek hayat örnekleri ile konuyu pekiştireceğiz.",
+                  duration: 10,
+                },
+                {
+                  id: `${module.id}-content-4`,
+                  title: "Özet ve Değerlendirme",
+                  type: "audio",
+                  content:
+                    "Modülün özetini yaparak önemli noktaları tekrar edeceğiz.",
+                  duration: 6,
+                },
+              ],
+            })
+          );
+
+          // Modülleri sırala ve kaydet
+          const sortedModules = modulesWithContent.sort(
+            (a: Module, b: Module) => getNumericId(a.id) - getNumericId(b.id)
+          );
+          localStorage.setItem("currentModules", JSON.stringify(sortedModules));
+
+          setLearningPlan({
             ...activePlan,
-            modules: activePlan.modules
-              .map((module: Module) => ({
-                ...module,
-                contentPages: module.contentPages || [
-                  {
-                    id: "content-1",
-                    title: "Giriş ve Temel Kavramlar",
-                    type: "text",
-                    content:
-                      "Bu modülde öğreneceğiniz temel kavramları ve konuları tanıyacaksınız. İlk olarak konunun genel çerçevesini çizerek başlayacağız.",
-                    duration: 5,
-                  },
-                  {
-                    id: "content-2",
-                    title: "Detaylı Açıklamalar",
-                    type: "video",
-                    content:
-                      "Konunun detaylarına inerek, pratik örnekler üzerinden açıklamalar yapacağız. Bu bölümde teorik bilgileri pratiğe dökmeyi öğreneceksiniz.",
-                    duration: 8,
-                  },
-                  {
-                    id: "content-3",
-                    title: "Uygulamalı Örnekler",
-                    type: "interactive",
-                    content:
-                      "Gerçek hayat örnekleri ile konuyu pekiştireceğiz. İnteraktif alıştırmalar ile öğrendiklerinizi test edebileceksiniz.",
-                    duration: 10,
-                  },
-                  {
-                    id: "content-4",
-                    title: "Özet ve Değerlendirme",
-                    type: "audio",
-                    content:
-                      "Modülün özetini yaparak önemli noktaları tekrar edeceğiz. Öğrendiklerinizi değerlendirme fırsatı bulacaksınız.",
-                    duration: 6,
-                  },
-                ],
-              }))
-              .sort((a: Module, b: Module) => getNumericId(a.id) - getNumericId(b.id)), // Modülleri id'ye göre sırala
-          }
-
-          setLearningPlan(updatedPlan)
-          setUserData({
-            learningGoal: activePlan.learningGoal,
-            dailyTime: activePlan.dailyTime,
-            duration: activePlan.duration,
-            learningStyle: activePlan.learningStyle,
-            targetLevel: activePlan.targetLevel,
-          })
-          setCurrentScreen("dashboard")
+            modules: sortedModules,
+          });
+          setCurrentScreen("dashboard");
         } else {
-          // Plan bulunamadı veya tüm modüller tamamlanmış, sorulara git
-          setCurrentScreen("questions")
+          setCurrentScreen("questions");
         }
       } else {
-        // Plan yüklenirken hata oluştu, sorulara yönlendir
-        console.error("Plan yükleme hatası:", response.statusText)
-        setCurrentScreen("questions")
+        console.error("Plan yükleme hatası:", response.statusText);
+        setCurrentScreen("questions");
       }
     } catch (error) {
-      console.error("Plan yükleme hatası:", error)
-      setCurrentScreen("questions") // Hata durumunda sorulara yönlendir
+      console.error("Plan yükleme hatası:", error);
+      setCurrentScreen("questions");
     } finally {
-      setHasAttemptedPlanLoad(true) // Plan yükleme denemesi tamamlandı
+      setHasAttemptedPlanLoad(true);
     }
-  }
+  };
 
   const questions = [
     {
@@ -279,9 +330,21 @@ export default function MicroLearningPlatform() {
       field: "learningStyle" as keyof UserData,
       type: "select",
       options: [
-        { value: "visual", label: "Görsel öğrenme", desc: "Videolar ve grafikler" },
-        { value: "practical", label: "Uygulamalı öğrenme", desc: "Projeler ve pratik" },
-        { value: "reading", label: "Okuyarak öğrenme", desc: "Makaleler ve kitaplar" },
+        {
+          value: "visual",
+          label: "Görsel öğrenme",
+          desc: "Videolar ve grafikler",
+        },
+        {
+          value: "practical",
+          label: "Uygulamalı öğrenme",
+          desc: "Projeler ve pratik",
+        },
+        {
+          value: "reading",
+          label: "Okuyarak öğrenme",
+          desc: "Makaleler ve kitaplar",
+        },
         { value: "mixed", label: "Karma öğrenme", desc: "Her türlü içerik" },
       ],
       icon: FaBrain,
@@ -294,19 +357,23 @@ export default function MicroLearningPlatform() {
       type: "select",
       options: [
         { value: "beginner", label: "Başlangıç", desc: "Temelden başla" },
-        { value: "intermediate", label: "Orta seviye", desc: "Bilgini geliştir" },
+        {
+          value: "intermediate",
+          label: "Orta seviye",
+          desc: "Bilgini geliştir",
+        },
         { value: "advanced", label: "İleri seviye", desc: "Uzmanlaş" },
         { value: "expert", label: "Uzman seviye", desc: "Lider ol" },
       ],
       icon: FiTrendingUp,
       gradient: "from-indigo-500 to-purple-500",
     },
-  ]
+  ];
 
   const generateLearningPlan = async () => {
-    setCurrentScreen("loading")
-    setLoadingProgress(0)
-    setLoadingText("Senin için program oluşturuyoruz...")
+    setCurrentScreen("loading");
+    setLoadingProgress(0);
+    setLoadingText("Senin için program oluşturuyoruz...");
 
     try {
       const steps = [
@@ -316,20 +383,20 @@ export default function MicroLearningPlatform() {
         { text: "Kişiselleştirilmiş modüller hazırlanıyor...", progress: 60 },
         { text: "İçerik yapısı oluşturuluyor...", progress: 75 },
         { text: "Veritabanına kaydediliyor...", progress: 90 },
-      ]
+      ];
 
-      let stepIndex = 0
+      let stepIndex = 0;
       const loadingInterval = setInterval(() => {
         if (stepIndex < steps.length) {
-          setLoadingText(steps[stepIndex].text)
-          setLoadingProgress(steps[stepIndex].progress)
-          stepIndex++
+          setLoadingText(steps[stepIndex].text);
+          setLoadingProgress(steps[stepIndex].progress);
+          stepIndex++;
         }
-      }, 800)
+      }, 800);
 
-      const token = localStorage.getItem("access_token")
+      const token = localStorage.getItem("access_token");
       if (!token) {
-        throw new Error("Kullanıcı oturumu bulunamadı")
+        throw new Error("Kullanıcı oturumu bulunamadı");
       }
 
       const response = await fetch("/api/generate-plan", {
@@ -339,114 +406,171 @@ export default function MicroLearningPlatform() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ userData }),
-      })
+      });
 
       if (!response.ok) {
-        throw new Error("Plan oluşturulurken hata oluştu")
+        throw new Error("Plan oluşturulurken hata oluştu");
       }
 
-      const planData = await response.json()
-      clearInterval(loadingInterval)
+      const planData = await response.json();
+      clearInterval(loadingInterval);
 
-      setLoadingText("Tamamlandı!")
-      setLoadingProgress(100)
+      setLoadingText("Tamamlandı!");
+      setLoadingProgress(100);
 
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Her modül için varsayılan içerik sayfalarını ekle
+      const modulesWithContent = planData.modules.map(
+        (module: Module, index: number) => ({
+          ...module,
+          unlocked: index === 0 ? true : false, // İlk modülün kilidini aç
+          contentPages: [
+            {
+              id: `${module.id}-content-1`,
+              title: "Giriş ve Temel Kavramlar",
+              type: "text",
+              content:
+                "Bu modülde öğreneceğiniz temel kavramları ve konuları tanıyacaksınız.",
+              duration: 5,
+            },
+            {
+              id: `${module.id}-content-2`,
+              title: "Detaylı Açıklamalar",
+              type: "video",
+              content:
+                "Konunun detaylarına inerek, pratik örnekler üzerinden açıklamalar yapacağız.",
+              duration: 8,
+            },
+            {
+              id: `${module.id}-content-3`,
+              title: "Uygulamalı Örnekler",
+              type: "interactive",
+              content: "Gerçek hayat örnekleri ile konuyu pekiştireceğiz.",
+              duration: 10,
+            },
+            {
+              id: `${module.id}-content-4`,
+              title: "Özet ve Değerlendirme",
+              type: "audio",
+              content:
+                "Modülün özetini yaparak önemli noktaları tekrar edeceğiz.",
+              duration: 6,
+            },
+          ],
+        })
+      );
 
       // Modülleri id'ye göre sırala
-      const sortedModules = planData.modules.sort((a: Module, b: Module) => getNumericId(a.id) - getNumericId(b.id))
-      setLearningPlan({ ...planData, modules: sortedModules })
-      setCurrentScreen("dashboard")
-    } catch (error) {
-      console.error("Error generating plan:", error)
-      setLoadingText("Hata oluştu, lütfen tekrar deneyin...")
+      const sortedModules = modulesWithContent.sort(
+        (a: Module, b: Module) => getNumericId(a.id) - getNumericId(b.id)
+      );
 
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-      setCurrentScreen("questions")
+      // Local storage'a modül verilerini kaydet
+      localStorage.setItem("currentModules", JSON.stringify(sortedModules));
+
+      setLearningPlan({ ...planData, modules: sortedModules });
+      setCurrentScreen("dashboard");
+    } catch (error) {
+      console.error("Error generating plan:", error);
+      setLoadingText("Hata oluştu, lütfen tekrar deneyin...");
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      setCurrentScreen("questions");
     }
-  }
+  };
 
   const handleNext = () => {
     if (currentQuestion < questions.length - 1) {
-      setIsAnimating(true)
-      setSlideDirection("right")
+      setIsAnimating(true);
+      setSlideDirection("right");
       setTimeout(() => {
-        setCurrentQuestion(currentQuestion + 1)
-        setIsAnimating(false)
-      }, 300)
+        setCurrentQuestion(currentQuestion + 1);
+        setIsAnimating(false);
+      }, 300);
     } else {
-      generateLearningPlan()
+      generateLearningPlan();
     }
-  }
+  };
 
   const handlePrevious = () => {
     if (currentQuestion > 0) {
-      setIsAnimating(true)
-      setSlideDirection("left")
+      setIsAnimating(true);
+      setSlideDirection("left");
       setTimeout(() => {
-        setCurrentQuestion(currentQuestion - 1)
-        setIsAnimating(false)
-      }, 300)
+        setCurrentQuestion(currentQuestion - 1);
+        setIsAnimating(false);
+      }, 300);
     }
-  }
+  };
 
   const handleModuleClick = (module: Module) => {
+    // Modül kilitli değilse veya tamamlanmışsa
     if (module.unlocked || module.completed) {
-      setCurrentModule(module)
-      setCurrentContentPage(0)
-      setViewedContentPages(new Set([0]))
-      setModuleProgress(0)
-      setCurrentScreen("module-content")
+      // contentPages'in var olduğunu ve en az bir öğe içerdiğini kontrol et
+      if (!module.contentPages || module.contentPages.length === 0) {
+        console.error("Modül içeriği bulunamadı");
+        return;
+      }
+
+      // State'leri güvenli bir şekilde güncelle
+      setCurrentContentPage(0);
+      setViewedContentPages(new Set([0]));
+      setModuleProgress(0);
+      setCurrentModule(module);
+      setCurrentScreen("module-content");
     }
-  }
+  };
 
   const handleContentNext = () => {
-    if (currentModule && currentContentPage < currentModule.contentPages.length - 1) {
-      const nextPage = currentContentPage + 1
-      setCurrentContentPage(nextPage)
-      setViewedContentPages((prev) => new Set([...prev, nextPage]))
+    if (
+      currentModule &&
+      currentContentPage < currentModule.contentPages.length - 1
+    ) {
+      const nextPage = currentContentPage + 1;
+      setCurrentContentPage(nextPage);
+      setViewedContentPages((prev) => new Set([...prev, nextPage]));
 
       // Update progress based on viewed pages
-      const totalPages = currentModule.contentPages.length
-      const viewedCount = viewedContentPages.size + 1 // +1 for current page
-      const progress = (viewedCount / totalPages) * 100
-      setModuleProgress(progress)
+      const totalPages = currentModule.contentPages.length;
+      const viewedCount = viewedContentPages.size + 1; // +1 for current page
+      const progress = (viewedCount / totalPages) * 100;
+      setModuleProgress(progress);
     } else {
       // All content viewed, go to test
-      setCurrentScreen("module-test")
+      setCurrentScreen("module-test");
     }
-  }
+  };
 
   const handleContentPrevious = () => {
     if (currentContentPage > 0) {
-      setCurrentContentPage(currentContentPage - 1)
+      setCurrentContentPage(currentContentPage - 1);
     }
-  }
+  };
 
   const startModuleTest = () => {
-    setCurrentScreen("module-test")
-  }
+    setCurrentScreen("module-test");
+  };
 
   const handleAnswerSelect = (answer: string) => {
-    setSelectedAnswer(answer)
-  }
+    setSelectedAnswer(answer);
+  };
 
   const submitTest = () => {
     // Simulate test evaluation
-    const isCorrect = Math.random() > 0.5 // Random for demo
+    const isCorrect = Math.random() > 0.5; // Random for demo
     if (isCorrect) {
-      setCorrectAnswers((prev) => prev + 1)
+      setCorrectAnswers((prev) => prev + 1);
     } else {
-      setWrongAnswers((prev) => prev + 1)
+      setWrongAnswers((prev) => prev + 1);
     }
-    setCurrentScreen("module-complete")
-  }
+    setCurrentScreen("module-complete");
+  };
 
   const completeModule = async () => {
     if (currentModule && learningPlan) {
       try {
-        const token = localStorage.getItem("access_token")
-        if (!token) return
+        const token = localStorage.getItem("access_token");
+        if (!token) return;
 
         // Save feedback if provided
         if (feedback.trim()) {
@@ -460,7 +584,7 @@ export default function MicroLearningPlatform() {
               moduleId: currentModule.id,
               feedback: feedback.trim(),
             }),
-          })
+          });
         }
 
         // Update module completion status
@@ -475,54 +599,56 @@ export default function MicroLearningPlatform() {
             completed: true,
             unlockNext: true,
           }),
-        })
+        });
 
         // Update local state
         const updatedModules = learningPlan.modules.map((m) => {
           if (m.id === currentModule.id) {
-            return { ...m, completed: true }
+            return { ...m, completed: true };
           }
-          return m
-        })
+          return m;
+        });
 
         // Find current module index and unlock next
-        const currentIndex = updatedModules.findIndex((m) => m.id === currentModule.id)
+        const currentIndex = updatedModules.findIndex(
+          (m) => m.id === currentModule.id
+        );
         if (currentIndex < updatedModules.length - 1) {
-          updatedModules[currentIndex + 1].unlocked = true
+          updatedModules[currentIndex + 1].unlocked = true;
         }
 
         // Check if all modules are completed
-        const allModulesCompleted = updatedModules.every((m) => m.completed)
+        const allModulesCompleted = updatedModules.every((m) => m.completed);
 
-        setLearningPlan({ ...learningPlan, modules: updatedModules })
-        setCurrentScreen("dashboard")
-        setCurrentModule(null)
-        setFeedback("")
-        setCorrectAnswers(0)
-        setWrongAnswers(0)
-        setSelectedAnswer("")
-        setCurrentContentPage(0)
-        setViewedContentPages(new Set())
-        setModuleProgress(0)
+        setLearningPlan({ ...learningPlan, modules: updatedModules });
+        setCurrentScreen("dashboard");
+        setCurrentModule(null);
+        setFeedback("");
+        setCorrectAnswers(0);
+        setWrongAnswers(0);
+        setSelectedAnswer("");
+        setCurrentContentPage(0);
+        setViewedContentPages(new Set());
+        setModuleProgress(0);
 
         // If all modules are completed, show completion message
         if (allModulesCompleted) {
           // Plan tamamlandı, kullanıcı dashboard'da tamamlama mesajını görecek
-          console.log("Tüm modüller tamamlandı!")
+          console.log("Tüm modüller tamamlandı!");
         }
       } catch (error) {
-        console.error("Modül tamamlama hatası:", error)
+        console.error("Modül tamamlama hatası:", error);
       }
     }
-  }
+  };
 
   const regeneratePlan = async () => {
-    setShowRegenerateDialog(false)
-    
+    setShowRegenerateDialog(false);
+
     // Deactivate current plan if it exists
     if (learningPlan?.id) {
       try {
-        const token = localStorage.getItem("access_token")
+        const token = localStorage.getItem("access_token");
         if (token) {
           await fetch("/api/deactivate-plan", {
             method: "POST",
@@ -533,56 +659,61 @@ export default function MicroLearningPlatform() {
             body: JSON.stringify({
               planId: learningPlan.id,
             }),
-          })
+          });
         }
       } catch (error) {
-        console.error("Plan deactivation error:", error)
+        console.error("Plan deactivation error:", error);
       }
     }
-    
-    setCurrentScreen("questions")
-    setCurrentQuestion(0)
-  }
 
-  const getModuleIcon = (type: string, completed: boolean, unlocked: boolean) => {
-    if (completed) return <FiCheckCircle className="w-6 h-6 text-emerald-400" />
-    if (!unlocked) return <FiCircle className="w-6 h-6 text-slate-400" />
+    setCurrentScreen("questions");
+    setCurrentQuestion(0);
+  };
+
+  const getModuleIcon = (
+    type: string,
+    completed: boolean,
+    unlocked: boolean
+  ) => {
+    if (completed)
+      return <FiCheckCircle className="w-6 h-6 text-emerald-400" />;
+    if (!unlocked) return <FiCircle className="w-6 h-6 text-slate-400" />;
 
     switch (type) {
       case "quiz":
-        return <FaBrain className="w-6 h-6 text-violet-400" />
+        return <FaBrain className="w-6 h-6 text-violet-400" />;
       case "exam":
-        return <FiAward className="w-6 h-6 text-amber-400" />
+        return <FiAward className="w-6 h-6 text-amber-400" />;
       default:
-        return <FiBookOpen className="w-6 h-6 text-sky-400" />
+        return <FiBookOpen className="w-6 h-6 text-sky-400" />;
     }
-  }
+  };
 
   const getContentIcon = (type: string) => {
     switch (type) {
       case "video":
-        return <FiVideo className="w-5 h-5" />
+        return <FiVideo className="w-5 h-5" />;
       case "audio":
-        return <FiHeadphones className="w-5 h-5" />
+        return <FiHeadphones className="w-5 h-5" />;
       case "interactive":
-        return <FiPlay className="w-5 h-5" />
+        return <FiPlay className="w-5 h-5" />;
       default:
-        return <FiFileText className="w-5 h-5" />
+        return <FiFileText className="w-5 h-5" />;
     }
-  }
+  };
 
   const getContentTypeLabel = (type: string) => {
     switch (type) {
       case "video":
-        return "Video İçerik"
+        return "Video İçerik";
       case "audio":
-        return "Ses İçeriği"
+        return "Ses İçeriği";
       case "interactive":
-        return "İnteraktif İçerik"
+        return "İnteraktif İçerik";
       default:
-        return "Metin İçeriği"
+        return "Metin İçeriği";
     }
-  }
+  };
 
   // Genel yükleme ekranı
   if (currentScreen === "loading" && !hasAttemptedPlanLoad) {
@@ -595,7 +726,7 @@ export default function MicroLearningPlatform() {
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
   if (currentScreen === "welcome") {
@@ -624,17 +755,23 @@ export default function MicroLearningPlatform() {
               <div className="text-center">
                 <FiTarget className="w-8 h-8 mx-auto mb-2 text-blue-300" />
                 <h3 className="font-semibold mb-1">Hedef Odaklı</h3>
-                <p className="text-sm text-white/70">Kişisel hedeflerinize uygun planlar</p>
+                <p className="text-sm text-white/70">
+                  Kişisel hedeflerinize uygun planlar
+                </p>
               </div>
               <div className="text-center">
                 <FiTrendingUp className="w-8 h-8 mx-auto mb-2 text-green-300" />
                 <h3 className="font-semibold mb-1">İlerleme Takibi</h3>
-                <p className="text-sm text-white/70">Gelişiminizi görsel olarak takip edin</p>
+                <p className="text-sm text-white/70">
+                  Gelişiminizi görsel olarak takip edin
+                </p>
               </div>
               <div className="text-center">
                 <FiUsers className="w-8 h-8 mx-auto mb-2 text-purple-300" />
                 <h3 className="font-semibold mb-1">Topluluk</h3>
-                <p className="text-sm text-white/70">Diğer öğrencilerle etkileşim kurun</p>
+                <p className="text-sm text-white/70">
+                  Diğer öğrencilerle etkileşim kurun
+                </p>
               </div>
             </div>
 
@@ -665,12 +802,12 @@ export default function MicroLearningPlatform() {
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
   if (currentScreen === "questions") {
-    const currentQ = questions[currentQuestion]
-    const IconComponent = currentQ.icon
+    const currentQ = questions[currentQuestion];
+    const IconComponent = currentQ.icon;
 
     return (
       <div
@@ -687,7 +824,9 @@ export default function MicroLearningPlatform() {
           {/* Progress indicator */}
           <div className="mb-8">
             <div className="flex justify-between items-center mb-4">
-              <span className="text-white/80 text-sm font-medium">İlerleme</span>
+              <span className="text-white/80 text-sm font-medium">
+                İlerleme
+              </span>
               <span className="text-white/80 text-sm font-medium">
                 {currentQuestion + 1} / {questions.length}
               </span>
@@ -695,7 +834,9 @@ export default function MicroLearningPlatform() {
             <div className="relative bg-white/20 rounded-full h-3 overflow-hidden">
               <div
                 className="absolute inset-0 bg-gradient-to-r from-white/60 to-white/80 rounded-full h-3 transition-all duration-500 ease-out"
-                style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }}
+                style={{
+                  width: `${((currentQuestion + 1) / questions.length) * 100}%`,
+                }}
               ></div>
             </div>
           </div>
@@ -731,14 +872,21 @@ export default function MicroLearningPlatform() {
                     <Input
                       placeholder={currentQ.placeholder}
                       value={userData[currentQ.field]}
-                      onChange={(e) => setUserData({ ...userData, [currentQ.field]: e.target.value })}
+                      onChange={(e) =>
+                        setUserData({
+                          ...userData,
+                          [currentQ.field]: e.target.value,
+                        })
+                      }
                       className="input-modern text-white placeholder:text-white/50 h-14 text-lg"
                     />
                   </div>
                 ) : (
                   <Select
                     value={userData[currentQ.field]}
-                    onValueChange={(value) => setUserData({ ...userData, [currentQ.field]: value })}
+                    onValueChange={(value) =>
+                      setUserData({ ...userData, [currentQ.field]: value })
+                    }
                   >
                     <SelectTrigger className="input-modern text-white h-14 text-lg">
                       <SelectValue placeholder="Seçiniz..." />
@@ -752,7 +900,11 @@ export default function MicroLearningPlatform() {
                         >
                           <div className="flex flex-col">
                             <span className="font-medium">{option.label}</span>
-                            {option.desc && <span className="text-sm text-slate-600">{option.desc}</span>}
+                            {option.desc && (
+                              <span className="text-sm text-slate-600">
+                                {option.desc}
+                              </span>
+                            )}
                           </div>
                         </SelectItem>
                       ))}
@@ -794,7 +946,7 @@ export default function MicroLearningPlatform() {
           </Card>
         </div>
       </div>
-    )
+    );
   }
 
   if (currentScreen === "loading") {
@@ -810,7 +962,8 @@ export default function MicroLearningPlatform() {
           <CardContent className="p-10 text-center">
             <div className="mb-8">
               <div className="relative w-20 h-20 mx-auto mb-6">
-                <div className="spinner-modern"></div> {/* Modern spinner sınıfı */}
+                <div className="spinner-modern"></div>{" "}
+                {/* Modern spinner sınıfı */}
               </div>
               <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-white to-yellow-200 bg-clip-text text-transparent">
                 {loadingText}
@@ -821,24 +974,30 @@ export default function MicroLearningPlatform() {
                   style={{ width: `${loadingProgress}%` }}
                 ></div>
               </div>
-              <p className="text-white/60 text-sm mt-3 font-medium">{loadingProgress}%</p>
+              <p className="text-white/60 text-sm mt-3 font-medium">
+                {loadingProgress}%
+              </p>
             </div>
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
   if (currentScreen === "dashboard" && learningPlan) {
-    const completedCount = learningPlan.modules.filter((m) => m.completed).length
-    const totalCount = learningPlan.modules.length
-    const progressPercentage = (completedCount / totalCount) * 100
+    const completedCount = learningPlan.modules.filter(
+      (m) => m.completed
+    ).length;
+    const totalCount = learningPlan.modules.length;
+    const progressPercentage = (completedCount / totalCount) * 100;
 
     // Modüller zaten setLearningPlan içinde sıralanmış olduğu için burada tekrar sıralamaya gerek yok.
-    const sequentialModules = learningPlan.modules
+    const sequentialModules = learningPlan.modules;
 
     // Find current active module (first unlocked but not completed)
-    const currentActiveModule = sequentialModules.find((m) => m.unlocked && !m.completed)
+    const currentActiveModule = sequentialModules.find(
+      (m) => m.unlocked && !m.completed
+    );
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 font-inter">
@@ -852,22 +1011,30 @@ export default function MicroLearningPlatform() {
                   <FiBookOpen className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-slate-800">Mikro Öğrenme</h1>
-                  <p className="text-sm text-slate-500">Kişisel gelişim platformu</p>
+                  <h1 className="text-xl font-bold text-slate-800">
+                    Mikro Öğrenme
+                  </h1>
+                  <p className="text-sm text-slate-500">
+                    Kişisel gelişim platformu
+                  </p>
                 </div>
               </div>
 
               {/* User Profile */}
               <div className="flex items-center space-x-4">
                 <div className="text-right">
-                  <p className="text-sm font-medium text-slate-700">{user?.full_name || "Kullanıcı"}</p>
+                  <p className="text-sm font-medium text-slate-700">
+                    {user?.full_name || "Kullanıcı"}
+                  </p>
                   <p className="text-xs text-slate-500">Öğrenci</p>
                 </div>
                 <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-blue-500 rounded-full flex items-center justify-center shadow-lg">
-                  <span className="text-white font-semibold text-sm">{user?.full_name?.charAt(0) || "U"}</span>
+                  <span className="text-white font-semibold text-sm">
+                    {user?.full_name?.charAt(0) || "U"}
+                  </span>
                 </div>
                 <Button
-                  onClick={signOut}
+                  onClick={handleSignOut}
                   variant="ghost"
                   size="sm"
                   className="text-slate-600 hover:text-slate-800 hover:bg-slate-100"
@@ -893,8 +1060,12 @@ export default function MicroLearningPlatform() {
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/50">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-slate-600">Toplam Modül</p>
-                  <p className="text-2xl font-bold text-slate-800">{totalCount}</p>
+                  <p className="text-sm font-medium text-slate-600">
+                    Toplam Modül
+                  </p>
+                  <p className="text-2xl font-bold text-slate-800">
+                    {totalCount}
+                  </p>
                 </div>
                 <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
                   <FiBookOpen className="w-6 h-6 text-blue-600" />
@@ -905,8 +1076,12 @@ export default function MicroLearningPlatform() {
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/50">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-slate-600">Tamamlanan</p>
-                  <p className="text-2xl font-bold text-emerald-600">{completedCount}</p>
+                  <p className="text-sm font-medium text-slate-600">
+                    Tamamlanan
+                  </p>
+                  <p className="text-2xl font-bold text-emerald-600">
+                    {completedCount}
+                  </p>
                 </div>
                 <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
                   <FiCheckCircle className="w-6 h-6 text-emerald-600" />
@@ -918,7 +1093,9 @@ export default function MicroLearningPlatform() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-slate-600">Kalan</p>
-                  <p className="text-2xl font-bold text-amber-600">{totalCount - completedCount}</p>
+                  <p className="text-2xl font-bold text-amber-600">
+                    {totalCount - completedCount}
+                  </p>
                 </div>
                 <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
                   <FiClock className="w-6 h-6 text-amber-600" />
@@ -930,7 +1107,9 @@ export default function MicroLearningPlatform() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-slate-600">İlerleme</p>
-                  <p className="text-2xl font-bold text-purple-600">{Math.round(progressPercentage)}%</p>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {Math.round(progressPercentage)}%
+                  </p>
                 </div>
                 <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
                   <FiTrendingUp className="w-6 h-6 text-purple-600" />
@@ -942,7 +1121,9 @@ export default function MicroLearningPlatform() {
           {/* Progress Overview */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/50 mb-8">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-slate-800">Genel İlerleme</h3>
+              <h3 className="text-lg font-semibold text-slate-800">
+                Genel İlerleme
+              </h3>
               <Button
                 onClick={() => setShowRegenerateDialog(true)}
                 variant="outline-modern" // Yeni varyantı kullan
@@ -978,14 +1159,15 @@ export default function MicroLearningPlatform() {
                     Tebrikler! 🎉
                   </h3>
                   <p className="text-emerald-700 mb-4">
-                    Tüm modülleri başarıyla tamamladınız. Yeni bir öğrenme yolculuğuna başlamak ister misiniz?
+                    Tüm modülleri başarıyla tamamladınız. Yeni bir öğrenme
+                    yolculuğuna başlamak ister misiniz?
                   </p>
                   <div className="flex space-x-3">
                     <Button
                       onClick={async () => {
                         if (learningPlan?.id) {
                           try {
-                            const token = localStorage.getItem("access_token")
+                            const token = localStorage.getItem("access_token");
                             if (token) {
                               await fetch("/api/deactivate-plan", {
                                 method: "POST",
@@ -996,13 +1178,13 @@ export default function MicroLearningPlatform() {
                                 body: JSON.stringify({
                                   planId: learningPlan.id,
                                 }),
-                              })
+                              });
                             }
                           } catch (error) {
-                            console.error("Plan deactivation error:", error)
+                            console.error("Plan deactivation error:", error);
                           }
                         }
-                        setShowRegenerateDialog(true)
+                        setShowRegenerateDialog(true);
                       }}
                       className="bg-emerald-500 hover:bg-emerald-600 text-white"
                     >
@@ -1013,7 +1195,7 @@ export default function MicroLearningPlatform() {
                       onClick={async () => {
                         if (learningPlan?.id) {
                           try {
-                            const token = localStorage.getItem("access_token")
+                            const token = localStorage.getItem("access_token");
                             if (token) {
                               await fetch("/api/deactivate-plan", {
                                 method: "POST",
@@ -1024,13 +1206,13 @@ export default function MicroLearningPlatform() {
                                 body: JSON.stringify({
                                   planId: learningPlan.id,
                                 }),
-                              })
+                              });
                             }
                           } catch (error) {
-                            console.error("Plan deactivation error:", error)
+                            console.error("Plan deactivation error:", error);
                           }
                         }
-                        setCurrentScreen("questions")
+                        setCurrentScreen("questions");
                       }}
                       variant="outline"
                       className="border-emerald-300 text-emerald-700 hover:bg-emerald-50"
@@ -1047,7 +1229,9 @@ export default function MicroLearningPlatform() {
           {/* Modules Grid */}
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h3 className="text-xl font-semibold text-slate-800">Öğrenme Modülleri</h3>
+              <h3 className="text-xl font-semibold text-slate-800">
+                Öğrenme Modülleri
+              </h3>
               <div className="flex items-center space-x-2 text-sm text-slate-500">
                 <div className="flex items-center space-x-1">
                   <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
@@ -1066,10 +1250,10 @@ export default function MicroLearningPlatform() {
 
             <div className="grid gap-4">
               {sequentialModules.map((module, index) => {
-                const isActive = currentActiveModule?.id === module.id
-                const isLocked = !module.unlocked
-                const isCompleted = module.completed
-                const canReopen = module.completed // Tamamlanan modüller tekrar açılabilir
+                const isActive = currentActiveModule?.id === module.id;
+                const isLocked = !module.unlocked;
+                const isCompleted = module.completed;
+                const canReopen = module.completed; // Tamamlanan modüller tekrar açılabilir
 
                 return (
                   <div
@@ -1078,12 +1262,15 @@ export default function MicroLearningPlatform() {
                       isCompleted
                         ? "border-emerald-200 hover:border-emerald-300 hover:shadow-md"
                         : isActive
-                          ? "border-blue-200 hover:border-blue-300 hover:shadow-md ring-2 ring-blue-100"
-                          : isLocked
-                            ? "border-slate-200 opacity-60 cursor-not-allowed"
-                            : "border-slate-200 hover:border-slate-300 hover:shadow-md"
+                        ? "border-blue-200 hover:border-blue-300 hover:shadow-md ring-2 ring-blue-100"
+                        : isLocked
+                        ? "border-slate-200 opacity-60 cursor-not-allowed"
+                        : "border-slate-200 hover:border-slate-300 hover:shadow-md"
                     }`}
-                    onClick={() => (module.unlocked || canReopen) && handleModuleClick(module)}
+                    onClick={() =>
+                      (module.unlocked || canReopen) &&
+                      handleModuleClick(module)
+                    }
                   >
                     <div className="flex items-center space-x-4">
                       {/* Module Number & Status */}
@@ -1093,10 +1280,10 @@ export default function MicroLearningPlatform() {
                             isCompleted
                               ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/25"
                               : isActive
-                                ? "bg-blue-500 text-white shadow-lg shadow-blue-500/25"
-                                : isLocked
-                                  ? "bg-slate-200 text-slate-400"
-                                  : "bg-slate-100 text-slate-600 group-hover:bg-slate-200"
+                              ? "bg-blue-500 text-white shadow-lg shadow-blue-500/25"
+                              : isLocked
+                              ? "bg-slate-200 text-slate-400"
+                              : "bg-slate-100 text-slate-600 group-hover:bg-slate-200"
                           }`}
                         >
                           {isCompleted ? (
@@ -1115,7 +1302,9 @@ export default function MicroLearningPlatform() {
                       {/* Module Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-3 mb-1">
-                          <h4 className="text-lg font-semibold text-slate-800 truncate">{module.title}</h4>
+                          <h4 className="text-lg font-semibold text-slate-800 truncate">
+                            {module.title}
+                          </h4>
                           <Badge
                             variant="secondary"
                             className={`badge-modern ${
@@ -1123,21 +1312,29 @@ export default function MicroLearningPlatform() {
                               module.type === "quiz"
                                 ? "bg-purple-500 text-white" // Doğrudan renkleri kullan
                                 : module.type === "exam"
-                                  ? "bg-amber-500 text-white"
-                                  : "bg-blue-500 text-white"
+                                ? "bg-amber-500 text-white"
+                                : "bg-blue-500 text-white"
                             }`}
                           >
-                            {module.type === "quiz" ? "Quiz" : module.type === "exam" ? "Sınav" : "Ders"}
+                            {module.type === "quiz"
+                              ? "Quiz"
+                              : module.type === "exam"
+                              ? "Sınav"
+                              : "Ders"}
                           </Badge>
                         </div>
-                        <p className="text-slate-600 text-sm line-clamp-2 mb-2">{module.description}</p>
+                        <p className="text-slate-600 text-sm line-clamp-2 mb-2">
+                          {module.description}
+                        </p>
 
                         {/* Status Text */}
                         <div className="flex items-center space-x-4 text-sm">
                           {isCompleted && (
                             <div className="flex items-center space-x-1 text-emerald-600">
                               <FiCheckCircle className="w-4 h-4" />
-                              <span className="font-medium">Tamamlandı - Tekrar Aç</span>
+                              <span className="font-medium">
+                                Tamamlandı - Tekrar Aç
+                              </span>
                             </div>
                           )}
                           {isActive && (
@@ -1160,7 +1357,11 @@ export default function MicroLearningPlatform() {
                         {(module.unlocked || canReopen) && (
                           <FiArrowRight
                             className={`w-5 h-5 transition-all duration-300 group-hover:translate-x-1 ${
-                              isCompleted ? "text-emerald-500" : isActive ? "text-blue-500" : "text-slate-400"
+                              isCompleted
+                                ? "text-emerald-500"
+                                : isActive
+                                ? "text-blue-500"
+                                : "text-slate-400"
                             }`}
                           />
                         )}
@@ -1180,7 +1381,7 @@ export default function MicroLearningPlatform() {
                       </div>
                     )}
                   </div>
-                )
+                );
               })}
             </div>
           </div>
@@ -1193,9 +1394,12 @@ export default function MicroLearningPlatform() {
                   <div className="w-16 h-16 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
                     <FiAward className="w-8 h-8 text-white" />
                   </div>
-                  <h3 className="text-2xl font-bold text-slate-800 mb-2">Tebrikler! 🎉</h3>
+                  <h3 className="text-2xl font-bold text-slate-800 mb-2">
+                    Tebrikler! 🎉
+                  </h3>
                   <p className="text-slate-600 text-lg mb-4">
-                    Tüm modülleri başarıyla tamamladın. Öğrenme yolculuğun harika geçti!
+                    Tüm modülleri başarıyla tamamladın. Öğrenme yolculuğun
+                    harika geçti!
                   </p>
                   <div className="flex justify-center space-x-4">
                     <Button
@@ -1212,14 +1416,37 @@ export default function MicroLearningPlatform() {
           )}
         </div>
       </div>
-    )
+    );
   }
 
   // Module Content Screen - Modern Design
   if (currentScreen === "module-content" && currentModule) {
-    const currentContent = currentModule.contentPages[currentContentPage]
-    const totalPages = currentModule.contentPages.length
-    const contentProgress = (viewedContentPages.size / totalPages) * 100
+    // Güvenlik kontrolleri
+    if (
+      !currentModule.contentPages ||
+      currentModule.contentPages.length === 0
+    ) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 font-inter p-8">
+          <div className="max-w-4xl mx-auto text-center">
+            <h2 className="text-2xl font-bold text-red-600">Hata</h2>
+            <p className="text-slate-600 mt-2">
+              Modül içeriği yüklenemedi. Lütfen daha sonra tekrar deneyin.
+            </p>
+            <Button
+              onClick={() => setCurrentScreen("dashboard")}
+              className="mt-4"
+              variant="outline"
+            >
+              Dashboard'a Dön
+            </Button>
+          </div>
+        </div>
+      );
+    }
+    const currentContent = currentModule.contentPages[currentContentPage];
+    const totalPages = currentModule.contentPages.length;
+    const contentProgress = (viewedContentPages.size / totalPages) * 100;
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 font-inter">
@@ -1237,7 +1464,9 @@ export default function MicroLearningPlatform() {
               </Button>
 
               <div className="text-center">
-                <h1 className="text-xl font-bold text-slate-800">{currentModule.title}</h1>
+                <h1 className="text-xl font-bold text-slate-800">
+                  {currentModule.title}
+                </h1>
                 <p className="text-sm text-slate-500">İçerik Sayfası</p>
               </div>
 
@@ -1255,8 +1484,12 @@ export default function MicroLearningPlatform() {
           {/* Progress Section */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/50 mb-8">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-slate-800">İçerik İlerlemesi</h3>
-              <span className="text-sm text-slate-600">{Math.round(contentProgress)}% Tamamlandı</span>
+              <h3 className="text-lg font-semibold text-slate-800">
+                İçerik İlerlemesi
+              </h3>
+              <span className="text-sm text-slate-600">
+                {Math.round(contentProgress)}% Tamamlandı
+              </span>
             </div>
             <div className="w-full bg-slate-200 rounded-full h-3">
               <div
@@ -1279,9 +1512,14 @@ export default function MicroLearningPlatform() {
                   {getContentIcon(currentContent.type)}
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-800">{currentContent.title}</h2>
+                  <h2 className="text-2xl font-bold text-slate-800">
+                    {currentContent.title}
+                  </h2>
                   <div className="flex items-center space-x-4 mt-2">
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                    <Badge
+                      variant="secondary"
+                      className="bg-blue-100 text-blue-700"
+                    >
                       {getContentTypeLabel(currentContent.type)}
                     </Badge>
                     <div className="flex items-center space-x-1 text-sm text-slate-600">
@@ -1296,14 +1534,18 @@ export default function MicroLearningPlatform() {
             {/* Content Body */}
             <div className="p-8">
               <div className="prose prose-slate max-w-none">
-                <p className="text-lg text-slate-700 leading-relaxed">{currentContent.content}</p>
+                <p className="text-lg text-slate-700 leading-relaxed">
+                  {currentContent.content}
+                </p>
               </div>
 
               {/* Content Type Specific Elements */}
               {currentContent.type === "video" && (
                 <div className="mt-8 bg-slate-100 rounded-xl p-8 text-center">
                   <FiVideo className="w-16 h-16 mx-auto text-slate-400 mb-4" />
-                  <p className="text-slate-600">Video içeriği burada görüntülenecek</p>
+                  <p className="text-slate-600">
+                    Video içeriği burada görüntülenecek
+                  </p>
                 </div>
               )}
 
@@ -1317,7 +1559,9 @@ export default function MicroLearningPlatform() {
               {currentContent.type === "interactive" && (
                 <div className="mt-8 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-8 text-center border border-blue-200">
                   <FiPlay className="w-16 h-16 mx-auto text-blue-500 mb-4" />
-                  <p className="text-slate-700 font-medium">İnteraktif içerik burada yer alacak</p>
+                  <p className="text-slate-700 font-medium">
+                    İnteraktif içerik burada yer alacak
+                  </p>
                   <Button variant="modern" className="mt-4">
                     Etkileşimi Başlat
                   </Button>
@@ -1346,8 +1590,8 @@ export default function MicroLearningPlatform() {
                     index === currentContentPage
                       ? "bg-blue-500 scale-125"
                       : viewedContentPages.has(index)
-                        ? "bg-emerald-500"
-                        : "bg-slate-300"
+                      ? "bg-emerald-500"
+                      : "bg-slate-300"
                   }`}
                 />
               ))}
@@ -1373,7 +1617,7 @@ export default function MicroLearningPlatform() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   // Module Test Screen - Modern Design
@@ -1394,7 +1638,9 @@ export default function MicroLearningPlatform() {
               </Button>
 
               <div className="text-center">
-                <h1 className="text-xl font-bold text-slate-800">{currentModule.title}</h1>
+                <h1 className="text-xl font-bold text-slate-800">
+                  {currentModule.title}
+                </h1>
                 <p className="text-sm text-slate-500">Değerlendirme Testi</p>
               </div>
 
@@ -1416,8 +1662,12 @@ export default function MicroLearningPlatform() {
                   <FaBrain className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-800">Değerlendirme Sorusu</h2>
-                  <p className="text-slate-600 mt-1">Öğrendiklerinizi test edin</p>
+                  <h2 className="text-2xl font-bold text-slate-800">
+                    Değerlendirme Sorusu
+                  </h2>
+                  <p className="text-slate-600 mt-1">
+                    Öğrendiklerinizi test edin
+                  </p>
                 </div>
               </div>
             </div>
@@ -1429,7 +1679,8 @@ export default function MicroLearningPlatform() {
                   {currentModule.quiz.question}
                 </h3>
 
-                {currentModule.quiz.type === "multiple" && currentModule.quiz.options ? (
+                {currentModule.quiz.type === "multiple" &&
+                currentModule.quiz.options ? (
                   <div className="space-y-4">
                     {currentModule.quiz.options.map((option, index) => (
                       <div
@@ -1451,7 +1702,9 @@ export default function MicroLearningPlatform() {
                           >
                             {String.fromCharCode(65 + index)}
                           </div>
-                          <span className="text-slate-700 font-medium">{option}</span>
+                          <span className="text-slate-700 font-medium">
+                            {option}
+                          </span>
                         </div>
                       </div>
                     ))}
@@ -1465,7 +1718,8 @@ export default function MicroLearningPlatform() {
                       className="input-modern min-h-32 resize-none" // input-modern sınıfını kullan
                     />
                     <p className="text-sm text-slate-500">
-                      Düşüncelerinizi ve öğrendiklerinizi açık bir şekilde ifade edin.
+                      Düşüncelerinizi ve öğrendiklerinizi açık bir şekilde ifade
+                      edin.
                     </p>
                   </div>
                 )}
@@ -1486,7 +1740,7 @@ export default function MicroLearningPlatform() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   // Module Complete Screen - Modern Design
@@ -1497,7 +1751,9 @@ export default function MicroLearningPlatform() {
         <div className="bg-white/80 backdrop-blur-xl border-b border-slate-200/50 sticky top-0 z-50">
           <div className="max-w-4xl mx-auto px-6 py-4">
             <div className="text-center">
-              <h1 className="text-xl font-bold text-slate-800">{currentModule.title}</h1>
+              <h1 className="text-xl font-bold text-slate-800">
+                {currentModule.title}
+              </h1>
               <p className="text-sm text-slate-500">Modül Tamamlandı</p>
             </div>
           </div>
@@ -1510,8 +1766,12 @@ export default function MicroLearningPlatform() {
               <div className="w-16 h-16 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
                 <FiAward className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-slate-800 mb-2">Tebrikler! 🎉</h2>
-              <p className="text-slate-600 text-lg">Modülü başarıyla tamamladın!</p>
+              <h2 className="text-2xl font-bold text-slate-800 mb-2">
+                Tebrikler! 🎉
+              </h2>
+              <p className="text-slate-600 text-lg">
+                Modülü başarıyla tamamladın!
+              </p>
             </div>
           </div>
 
@@ -1523,7 +1783,9 @@ export default function MicroLearningPlatform() {
                 <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
                   <FiTarget className="w-5 h-5 text-emerald-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-800">Kazanımlar</h3>
+                <h3 className="text-lg font-semibold text-slate-800">
+                  Kazanımlar
+                </h3>
               </div>
               <ul className="space-y-3">
                 {currentModule.objectives.map((objective, index) => (
@@ -1541,7 +1803,9 @@ export default function MicroLearningPlatform() {
                 <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
                   <FiBookmark className="w-5 h-5 text-blue-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-800">Kaynaklar</h3>
+                <h3 className="text-lg font-semibold text-slate-800">
+                  Kaynaklar
+                </h3>
               </div>
               <ul className="space-y-3">
                 {currentModule.resources.map((resource, index) => (
@@ -1560,16 +1824,26 @@ export default function MicroLearningPlatform() {
               <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
                 <FaBrain className="w-5 h-5 text-purple-600" />
               </div>
-              <h3 className="text-lg font-semibold text-slate-800">Test Sonuçları</h3>
+              <h3 className="text-lg font-semibold text-slate-800">
+                Test Sonuçları
+              </h3>
             </div>
             <div className="grid grid-cols-2 gap-6">
               <div className="text-center p-4 bg-emerald-50 rounded-xl border border-emerald-200">
-                <div className="text-3xl font-bold text-emerald-600 mb-1">{correctAnswers}</div>
-                <div className="text-sm text-emerald-700 font-medium">Doğru Cevap</div>
+                <div className="text-3xl font-bold text-emerald-600 mb-1">
+                  {correctAnswers}
+                </div>
+                <div className="text-sm text-emerald-700 font-medium">
+                  Doğru Cevap
+                </div>
               </div>
               <div className="text-center p-4 bg-red-50 rounded-xl border border-red-200">
-                <div className="text-3xl font-bold text-red-600 mb-1">{wrongAnswers}</div>
-                <div className="text-sm text-red-700 font-medium">Yanlış Cevap</div>
+                <div className="text-3xl font-bold text-red-600 mb-1">
+                  {wrongAnswers}
+                </div>
+                <div className="text-sm text-red-700 font-medium">
+                  Yanlış Cevap
+                </div>
               </div>
             </div>
           </div>
@@ -1580,7 +1854,9 @@ export default function MicroLearningPlatform() {
               <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
                 <FiStar className="w-5 h-5 text-amber-600" />
               </div>
-              <h3 className="text-lg font-semibold text-slate-800">Değerlendirme</h3>
+              <h3 className="text-lg font-semibold text-slate-800">
+                Değerlendirme
+              </h3>
             </div>
             <Textarea
               placeholder="Bu modül hakkında düşüncelerinizi, öğrendiklerinizi ve önerilerinizi paylaşın..."
@@ -1589,7 +1865,8 @@ export default function MicroLearningPlatform() {
               className="input-modern min-h-32 resize-none" // input-modern sınıfını kullan
             />
             <p className="text-sm text-slate-500 mt-2">
-              Geri bildiriminiz gelişimimize katkı sağlar ve diğer öğrenciler için faydalıdır.
+              Geri bildiriminiz gelişimimize katkı sağlar ve diğer öğrenciler
+              için faydalıdır.
             </p>
           </div>
 
@@ -1606,20 +1883,28 @@ export default function MicroLearningPlatform() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   return (
-    <AlertDialog open={showRegenerateDialog} onOpenChange={setShowRegenerateDialog}>
+    <AlertDialog
+      open={showRegenerateDialog}
+      onOpenChange={setShowRegenerateDialog}
+    >
       <AlertDialogContent className="bg-white/95 backdrop-blur-xl border-white/20">
         <AlertDialogHeader>
-          <AlertDialogTitle className="text-slate-800">Planı Yeniden Oluştur</AlertDialogTitle>
+          <AlertDialogTitle className="text-slate-800">
+            Planı Yeniden Oluştur
+          </AlertDialogTitle>
           <AlertDialogDescription className="text-slate-600">
-            Bu işlem mevcut ilerlemenizi silecek ve yeni bir plan oluşturacak. Devam etmek istediğinizden emin misiniz?
+            Bu işlem mevcut ilerlemenizi silecek ve yeni bir plan oluşturacak.
+            Devam etmek istediğinizden emin misiniz?
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel className="bg-slate-100 hover:bg-slate-200 text-slate-800">İptal</AlertDialogCancel>
+          <AlertDialogCancel className="bg-slate-100 hover:bg-slate-200 text-slate-800">
+            İptal
+          </AlertDialogCancel>
           <AlertDialogAction
             onClick={regeneratePlan}
             variant="modern" // Yeni varyantı kullan
@@ -1630,5 +1915,5 @@ export default function MicroLearningPlatform() {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  )
+  );
 }
