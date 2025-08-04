@@ -55,9 +55,12 @@ interface UserData {
 interface ContentPage {
   id: string
   title: string
-  type: "text" | "video" | "audio" | "interactive"
+  type: "text" | "video" | "audio" | "interactive" | "evaluation"
   content: string
   duration: number // minutes
+  videoSuggestions?: string[]
+  task?: any
+  assessment?: any
 }
 
 interface Module {
@@ -76,6 +79,7 @@ interface Module {
   unlocked: boolean
   position: { x: number; y: number }
   type: "lesson" | "quiz" | "exam"
+  content_generated?: boolean
 }
 
 interface LearningPlan {
@@ -389,9 +393,143 @@ export default function MicroLearningPlatform() {
     }
   }
 
-  const handleModuleClick = (module: Module) => {
+  // Önceki modül performansını getir
+  const getPreviousModulePerformance = async (currentModuleId: string) => {
+    try {
+      const token = localStorage.getItem("access_token")
+      if (!token) return null
+      
+      const response = await fetch(`/api/get-previous-performance?moduleId=${currentModuleId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        return data.performance
+      }
+    } catch (error) {
+      console.error("Önceki performans alınamadı:", error)
+    }
+    return null
+  }
+
+  const handleModuleClick = async (module: Module) => {
     if (module.unlocked || module.completed) {
       setCurrentModule(module)
+      
+      // Eğer modül içeriği henüz generate edilmemişse, API'den al
+      if (!module.content_generated) {
+        setCurrentScreen("loading")
+        setLoadingText("Modül içeriği hazırlanıyor...")
+        setLoadingProgress(0)
+        
+        // Loading animation
+        const loadingInterval = setInterval(() => {
+          setLoadingProgress(prev => {
+            if (prev >= 90) {
+              clearInterval(loadingInterval)
+              return 90
+            }
+            return prev + 10
+          })
+        }, 200)
+        
+        try {
+          const token = localStorage.getItem("access_token")
+          
+          // Önceki modül performansını al
+          const previousPerformance = await getPreviousModulePerformance(module.id)
+          
+          // Zorluk seviyesini belirle
+          const difficulty = previousPerformance?.nextModuleDifficulty || 
+                           userData.targetLevel === 'beginner' ? 'beginner' :
+                           userData.targetLevel === 'advanced' ? 'advanced' : 'intermediate'
+          
+          const response = await fetch("/api/generate-module-content", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              moduleId: module.id,
+              section: "all", // Tüm bölümleri iste
+              difficulty: difficulty,
+              learningStyle: userData.learningStyle,
+              targetLevel: userData.targetLevel,
+              previousPerformance: previousPerformance
+            }),
+          })
+
+          if (response.ok) {
+            const contentData = await response.json()
+            setLoadingProgress(100)
+            
+            // Modülü güncellenmiş içerikle güncelle
+            const updatedModule = {
+              ...module,
+              contentPages: [
+                {
+                  id: "introduction",
+                  title: "Giriş ve Temel Kavramlar",
+                  type: "text" as const,
+                  content: contentData.introduction?.content || "İçerik yükleniyor...",
+                  duration: 8,
+                },
+                {
+                  id: "detailed_explanation", 
+                  title: "Detaylı Açıklamalar",
+                  type: "video" as const,
+                  content: contentData.detailed_explanation?.content || "İçerik yükleniyor...",
+                  videoSuggestions: contentData.detailed_explanation?.videoSuggestions || [],
+                  duration: 12,
+                },
+                {
+                  id: "practical_task",
+                  title: "Uygulamalı Örnek", 
+                  type: "interactive" as const,
+                  content: contentData.practical_task?.content || "{}",
+                  duration: 15,
+                },
+                {
+                  id: "summary_evaluation",
+                  title: "Özet ve Değerlendirme",
+                  type: "evaluation" as const,
+                  content: contentData.summary_evaluation?.content || "{}",
+                  duration: 10,
+                },
+              ],
+              content_generated: true
+            }
+            
+            setCurrentModule(updatedModule)
+            
+            // Learning plan'i de güncelle
+            setLearningPlan(prevPlan => {
+              if (!prevPlan) return prevPlan
+              return {
+                ...prevPlan,
+                modules: prevPlan.modules.map(m => 
+                  m.id === module.id ? updatedModule : m
+                )
+              }
+            })
+          } else {
+            console.error("Modül içeriği yüklenemedi")
+            // Fallback olarak mevcut içerikle devam et
+          }
+          
+          clearInterval(loadingInterval)
+          
+        } catch (error) {
+          console.error("Modül içeriği yüklenirken hata:", error)
+          clearInterval(loadingInterval)
+          // Hata durumunda fallback içerik kullan
+        }
+      }
+      
       setCurrentContentPage(0)
       setViewedContentPages(new Set([0]))
       setModuleProgress(0)
@@ -549,6 +687,82 @@ export default function MicroLearningPlatform() {
         return "İnteraktif İçerik"
       default:
         return "Metin İçeriği"
+    }
+  }
+
+  // Görev tamamlama handler'ı
+  const handleTaskComplete = async (submission: any) => {
+    try {
+      const token = localStorage.getItem("access_token")
+      if (!token || !currentModule) return
+
+      // Görevi veritabanına kaydet
+      const response = await fetch("/api/save-task-submission", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          moduleId: currentModule.id,
+          taskSubmission: submission,
+        }),
+      })
+
+      if (response.ok) {
+        console.log("Görev başarıyla kaydedildi")
+        // Sonraki içeriğe geç
+        handleContentNext()
+      }
+    } catch (error) {
+      console.error("Görev kaydedilirken hata:", error)
+    }
+  }
+
+  // Değerlendirme tamamlama handler'ı
+  const handleAssessmentComplete = async (answers: any) => {
+    try {
+      const token = localStorage.getItem("access_token")
+      if (!token || !currentModule) return
+
+      setCurrentScreen("loading")
+      setLoadingText("Değerlendirme yapılıyor...")
+
+      // AI ile değerlendirme yap
+      const response = await fetch("/api/evaluate-student-progress", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          moduleId: currentModule.id,
+          assessmentAnswers: answers,
+          userFeedback: feedback,
+        }),
+      })
+
+      if (response.ok) {
+        const evaluation = await response.json()
+        console.log("Değerlendirme tamamlandı:", evaluation)
+        
+        // Modülü tamamlandı olarak işaretle
+        if (learningPlan) {
+          setLearningPlan(prevPlan => ({
+            ...prevPlan!,
+            modules: prevPlan!.modules.map(m => 
+              m.id === currentModule.id 
+                ? { ...m, completed: true }
+                : m
+            )
+          }))
+        }
+
+        setCurrentScreen("module-complete")
+      }
+    } catch (error) {
+      console.error("Değerlendirme sırasında hata:", error)
+      setCurrentScreen("module-content")
     }
   }
 
@@ -1191,9 +1405,28 @@ export default function MicroLearningPlatform() {
 
               {/* Content Type Specific Elements */}
               {currentContent.type === "video" && (
-                <div className="mt-8 bg-slate-100 rounded-xl p-8 text-center">
-                  <FiVideo className="w-16 h-16 mx-auto text-slate-400 mb-4" />
-                  <p className="text-slate-600">Video içeriği burada görüntülenecek</p>
+                <div className="mt-8 space-y-6">
+                  <div className="bg-slate-100 rounded-xl p-8 text-center">
+                    <FiVideo className="w-16 h-16 mx-auto text-slate-400 mb-4" />
+                    <p className="text-slate-600">Video içeriği burada görüntülenecek</p>
+                  </div>
+                  
+                  {currentContent.videoSuggestions && currentContent.videoSuggestions.length > 0 && (
+                    <div className="bg-blue-50 rounded-xl p-6 border border-blue-200">
+                      <h4 className="font-semibold text-blue-800 mb-4 flex items-center">
+                        <FiPlay className="w-5 h-5 mr-2" />
+                        Önerilen Video Kaynakları
+                      </h4>
+                      <div className="space-y-3">
+                        {currentContent.videoSuggestions.map((suggestion: string, index: number) => (
+                          <div key={index} className="flex items-start space-x-3 p-3 bg-white rounded-lg">
+                            <FiVideo className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
+                            <span className="text-blue-700">{suggestion}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1205,12 +1438,22 @@ export default function MicroLearningPlatform() {
               )}
 
               {currentContent.type === "interactive" && (
-                <div className="mt-8 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-8 text-center border border-blue-200">
-                  <FiPlay className="w-16 h-16 mx-auto text-blue-500 mb-4" />
-                  <p className="text-slate-700 font-medium">İnteraktif içerik burada yer alacak</p>
-                  <Button variant="modern" className="mt-4">
-                    Etkileşimi Başlat
-                  </Button>
+                <div className="mt-8">
+                  <InteractiveTask 
+                    task={currentContent.task || JSON.parse(currentContent.content || '{}')}
+                    moduleId={currentModule.id}
+                    onComplete={(submission) => handleTaskComplete(submission)}
+                  />
+                </div>
+              )}
+
+              {currentContent.type === "evaluation" && (
+                <div className="mt-8">
+                  <AssessmentSection 
+                    assessment={currentContent.assessment || JSON.parse(currentContent.content || '{}')}
+                    moduleId={currentModule.id}
+                    onComplete={(answers) => handleAssessmentComplete(answers)}
+                  />
                 </div>
               )}
             </div>
@@ -1512,13 +1755,314 @@ export default function MicroLearningPlatform() {
           <AlertDialogCancel className="bg-slate-100 hover:bg-slate-200 text-slate-800">İptal</AlertDialogCancel>
           <AlertDialogAction
             onClick={regeneratePlan}
-            variant="modern" // Yeni varyantı kullan
-            className="text-white"
+            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
           >
             Evet, Yeniden Oluştur
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  )
+}
+
+// İnteraktif Görev Bileşeni
+function InteractiveTask({ task, moduleId, onComplete }: {
+  task: {
+    taskTitle: string
+    taskDescription: string
+    instructions: string[]
+    completionCriteria: string[]
+    interactionQuestions: Array<{
+      question: string
+      expectedResponse: string
+      followUpQuestions?: string[]
+    }>
+  }
+  moduleId: string
+  onComplete: (submission: any) => void
+}) {
+  const [currentStep, setCurrentStep] = useState<'instructions' | 'interaction' | 'completed'>('instructions')
+  const [responses, setResponses] = useState<{[key: string]: string}>({})
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [startTime] = useState(Date.now())
+
+  const handleStartInteraction = () => {
+    setCurrentStep('interaction')
+  }
+
+  const handleQuestionResponse = (response: string) => {
+    const questionKey = `question_${currentQuestionIndex}`
+    setResponses(prev => ({ ...prev, [questionKey]: response }))
+    
+    if (currentQuestionIndex < task.interactionQuestions.length - 1) {
+      setCurrentQuestionIndex(prev => prev + 1)
+    } else {
+      setCurrentStep('completed')
+    }
+  }
+
+  const handleSubmitTask = () => {
+    const completionTime = Math.round((Date.now() - startTime) / (1000 * 60)) // dakika cinsinden
+    
+    const submission = {
+      submissionData: {
+        responses,
+        taskId: task.taskTitle,
+        completedInstructions: task.instructions.length,
+        interactionCompleted: true
+      },
+      completionTime
+    }
+    
+    onComplete(submission)
+  }
+
+  if (currentStep === 'instructions') {
+    return (
+      <Card className="border-blue-200">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <span className="text-blue-600">🎯</span>
+            <span>{task.taskTitle}</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <p className="text-slate-700">{task.taskDescription}</p>
+          
+          <div>
+            <h4 className="font-semibold text-slate-800 mb-3">Talimatlar:</h4>
+            <ol className="space-y-2">
+              {task.instructions.map((instruction, index) => (
+                <li key={index} className="flex items-start space-x-3">
+                  <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-semibold">
+                    {index + 1}
+                  </span>
+                  <span className="text-slate-700">{instruction}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          <div>
+            <h4 className="font-semibold text-slate-800 mb-3">Tamamlama Kriterleri:</h4>
+            <ul className="space-y-1">
+              {task.completionCriteria.map((criteria, index) => (
+                <li key={index} className="flex items-start space-x-2">
+                  <span className="text-green-600">✓</span>
+                  <span className="text-slate-700">{criteria}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <Button onClick={handleStartInteraction} className="w-full">
+            Etkileşimi Başlat
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (currentStep === 'interaction') {
+    const currentQuestion = task.interactionQuestions[currentQuestionIndex]
+    
+    return (
+      <Card className="border-orange-200">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Etkileşimli Görev</span>
+            <span className="text-sm font-normal text-slate-500">
+              {currentQuestionIndex + 1} / {task.interactionQuestions.length}
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="bg-orange-50 p-4 rounded-lg">
+            <p className="font-medium text-orange-800">{currentQuestion.question}</p>
+          </div>
+          
+          <Textarea
+            placeholder="Cevabınızı detaylı olarak yazın..."
+            className="min-h-32"
+            onBlur={(e) => {
+              if (e.target.value.trim()) {
+                handleQuestionResponse(e.target.value)
+              }
+            }}
+          />
+          
+          <div className="flex justify-between">
+            <Button 
+              variant="outline" 
+              onClick={() => setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))}
+              disabled={currentQuestionIndex === 0}
+            >
+              Önceki
+            </Button>
+            <Button 
+              onClick={() => {
+                const textarea = document.querySelector('textarea') as HTMLTextAreaElement
+                if (textarea?.value.trim()) {
+                  handleQuestionResponse(textarea.value)
+                }
+              }}
+            >
+              {currentQuestionIndex === task.interactionQuestions.length - 1 ? 'Tamamla' : 'Sonraki'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="border-green-200">
+      <CardContent className="p-6 text-center">
+        <div className="text-6xl mb-4">🎉</div>
+        <h3 className="text-xl font-semibold text-green-800 mb-2">Görevi Tamamladınız!</h3>
+        <p className="text-green-700 mb-4">Harika! Tüm adımları başarıyla tamamladınız.</p>
+        <Button onClick={handleSubmitTask} className="bg-green-600 hover:bg-green-700">
+          Görevi Teslim Et
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
+// Değerlendirme Bileşeni
+function AssessmentSection({ assessment, moduleId, onComplete }: {
+  assessment: {
+    summary: string
+    assessmentQuestions: Array<{
+      question: string
+      type: 'multiple_choice' | 'open_ended'
+      options?: string[]
+      correctAnswer?: string
+      concept: string
+      difficulty: 'easy' | 'medium' | 'hard'
+    }>
+  }
+  moduleId: string
+  onComplete: (answers: any) => void
+}) {
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [answers, setAnswers] = useState<{[key: string]: string}>({})
+  const [showSummary, setShowSummary] = useState(true)
+
+  const handleAnswerChange = (questionId: string, answer: string) => {
+    setAnswers(prev => ({ ...prev, [questionId]: answer }))
+  }
+
+  const handleNext = () => {
+    if (currentQuestionIndex < assessment.assessmentQuestions.length - 1) {
+      setCurrentQuestionIndex(prev => prev + 1)
+    } else {
+      // Tüm sorular cevaplandı
+      const formattedAnswers = assessment.assessmentQuestions.map((question, index) => ({
+        questionId: `q_${index}`,
+        question: question.question,
+        userAnswer: answers[`q_${index}`] || '',
+        correctAnswer: question.correctAnswer || '',
+        concept: question.concept,
+        difficulty: question.difficulty
+      }))
+      
+      onComplete(formattedAnswers)
+    }
+  }
+
+  const handlePrevious = () => {
+    setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))
+  }
+
+  if (showSummary) {
+    return (
+      <Card className="border-purple-200">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <span className="text-purple-600">📋</span>
+            <span>Özet ve Değerlendirme</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="bg-purple-50 p-6 rounded-lg">
+            <h4 className="font-semibold text-purple-800 mb-3">Modül Özeti</h4>
+            <p className="text-purple-700">{assessment.summary}</p>
+          </div>
+          
+          <div className="text-center">
+            <p className="text-slate-600 mb-4">
+              Şimdi {assessment.assessmentQuestions.length} soruluk değerlendirme bölümüne geçiyoruz.
+            </p>
+            <Button onClick={() => setShowSummary(false)} className="bg-purple-600 hover:bg-purple-700">
+              Değerlendirmeye Başla
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const currentQuestion = assessment.assessmentQuestions[currentQuestionIndex]
+  const questionId = `q_${currentQuestionIndex}`
+
+  return (
+    <Card className="border-purple-200">
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <span>Değerlendirme</span>
+          <span className="text-sm font-normal text-slate-500">
+            {currentQuestionIndex + 1} / {assessment.assessmentQuestions.length}
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="bg-purple-50 p-4 rounded-lg">
+          <p className="font-medium text-purple-800">{currentQuestion.question}</p>
+        </div>
+
+        {currentQuestion.type === 'multiple_choice' && currentQuestion.options ? (
+          <div className="space-y-3">
+            {currentQuestion.options.map((option, index) => (
+              <label key={index} className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name={questionId}
+                  value={option}
+                  checked={answers[questionId] === option}
+                  onChange={(e) => handleAnswerChange(questionId, e.target.value)}
+                  className="w-4 h-4 text-purple-600"
+                />
+                <span className="text-slate-700">{option}</span>
+              </label>
+            ))}
+          </div>
+        ) : (
+          <Textarea
+            placeholder="Cevabınızı detaylı olarak yazın..."
+            value={answers[questionId] || ''}
+            onChange={(e) => handleAnswerChange(questionId, e.target.value)}
+            className="min-h-32"
+          />
+        )}
+
+        <div className="flex justify-between">
+          <Button 
+            variant="outline" 
+            onClick={handlePrevious}
+            disabled={currentQuestionIndex === 0}
+          >
+            Önceki Soru
+          </Button>
+          <Button 
+            onClick={handleNext}
+            disabled={!answers[questionId]}
+            className="bg-purple-600 hover:bg-purple-700"
+          >
+            {currentQuestionIndex === assessment.assessmentQuestions.length - 1 ? 'Değerlendirmeyi Tamamla' : 'Sonraki Soru'}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
