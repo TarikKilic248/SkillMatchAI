@@ -31,7 +31,8 @@ interface Module {
 // Advanced JSON cleaning and repair function
 function repairAndParseJSON(text: string) {
   try {
-    console.log("Attempting to parse JSON from:", text.substring(0, 200))
+    console.log("Original response length:", text.length)
+    console.log("Attempting to parse JSON from:", text.substring(0, 300))
     
     // Step 1: Basic cleaning
     let cleaned = text
@@ -42,60 +43,80 @@ function repairAndParseJSON(text: string) {
 
     // Step 2: Extract JSON content
     const firstBrace = cleaned.indexOf("{")
-    const lastBrace = cleaned.lastIndexOf("}")
+    let lastBrace = cleaned.lastIndexOf("}")
 
-    if (firstBrace === -1 || lastBrace === -1 || firstBrace >= lastBrace) {
-      throw new Error("No valid JSON structure found")
+    if (firstBrace === -1) {
+      throw new Error("No opening brace found")
+    }
+
+    // If no closing brace or it's incomplete, try to fix it
+    if (lastBrace === -1 || lastBrace <= firstBrace) {
+      console.log("Missing or invalid closing brace, attempting to add one")
+      // Find the last complete structure
+      let braceCount = 0
+      let lastValidPos = cleaned.length
+      
+      for (let i = firstBrace; i < cleaned.length; i++) {
+        if (cleaned[i] === '{') braceCount++
+        if (cleaned[i] === '}') {
+          braceCount--
+          if (braceCount === 0) {
+            lastValidPos = i + 1
+            break
+          }
+        }
+      }
+      
+      if (braceCount > 0) {
+        // Add missing closing braces
+        cleaned = cleaned.substring(0, lastValidPos) + '}]}'.repeat(Math.min(braceCount, 3))
+      }
+      lastBrace = cleaned.lastIndexOf("}")
     }
 
     cleaned = cleaned.substring(firstBrace, lastBrace + 1)
 
-    // Step 3: Fix common JSON issues
+    // Step 3: Quick parse attempt
+    try {
+      const result = JSON.parse(cleaned)
+      console.log("Successfully parsed JSON on first attempt")
+      return result
+    } catch (firstError) {
+      console.log("First parse failed, attempting repairs...")
+    }
+
+    // Step 4: Repair common issues
     cleaned = cleaned
-      // Fix trailing commas in arrays and objects
+      // Fix trailing commas
       .replace(/,(\s*[\]}])/g, "$1")
-      // Fix missing commas between array elements
-      .replace(/"\s*\n\s*"/g, '",\n"')
-      .replace(/}\s*\n\s*{/g, "},\n{")
-      .replace(/]\s*\n\s*\[/g, "],\n[")
-      // Fix missing commas between object properties
+      // Fix missing quotes around property names
+      .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
+      // Fix truncated strings
+      .replace(/"([^"]*)\s*$/, '"$1"')
+      // Fix missing commas between properties
       .replace(/"\s*\n\s*"/g, '",\n"')
       .replace(/([}\]"])\s*\n\s*"/g, '$1,\n"')
-      // Fix quotes
-      .replace(/'/g, '"')
-      // Remove any trailing text after the last }
-      .replace(/}\s*[^}]*$/, "}")
-      // Fix unescaped quotes in strings
-      .replace(/"([^"]*)"([^"]*)"([^"]*)"/g, '"$1$2$3"')
+      // Ensure arrays are properly closed
+      .replace(/\[\s*$/, '[]')
+      // Ensure objects are properly closed
+      .replace(/\{\s*$/, '{}')
 
-    console.log("Cleaned JSON:", cleaned.substring(0, 200))
+    console.log("Cleaned JSON (first 300 chars):", cleaned.substring(0, 300))
 
-    // Step 4: Try to parse
     try {
-      return JSON.parse(cleaned)
-    } catch (parseError) {
-      console.log("First parse failed, attempting repair...")
-
-      // Step 5: More aggressive repairs
-      cleaned = cleaned
-        // Fix array formatting issues
-        .replace(/\[\s*([^,[\]]+)\s*([^,[\]]+)\s*\]/g, '["$1", "$2"]')
-        // Ensure proper string quoting
-        .replace(/:\s*([^",[\]{}]+)(?=\s*[,}])/g, ': "$1"')
-        // Fix boolean and null values
-        .replace(/:\s*"(true|false|null)"/g, ": $1")
-        // Fix number values that got quoted
-        .replace(/:\s*"(\d+)"/g, ": $1")
-        // Fix broken strings
-        .replace(/"([^"]*)\s*\n\s*([^"]*)"/g, '"$1 $2"')
-
-      console.log("Repaired JSON:", cleaned.substring(0, 200))
-      return JSON.parse(cleaned)
+      const result = JSON.parse(cleaned)
+      console.log("Successfully parsed JSON after repairs")
+      return result
+    } catch (secondError) {
+      const errorMessage = secondError instanceof Error ? secondError.message : String(secondError)
+      console.error("JSON repair completely failed:", secondError)
+      console.error("Final cleaned text:", cleaned.substring(0, 1000))
+      throw new Error("Could not repair JSON: " + errorMessage)
     }
+
   } catch (error) {
-    console.error("JSON repair failed:", error)
-    console.error("Problematic text:", text.substring(0, 500))
-    throw new Error("Could not repair JSON")
+    console.error("JSON parsing error:", error)
+    throw new Error("Could not parse response as JSON")
   }
 }
 
@@ -185,22 +206,29 @@ function createFallbackPlan(userData: UserData) {
 
 // Simplified Gemini call with better error handling
 async function callGeminiSafely(prompt: string) {
-  const models = ["gemini-1.5-flash", "gemini-1.0-pro"]
+  const models = ["gemini-2.5-flash", "gemini-2.5-pro"]
 
   for (const model of models) {
     try {
       const { text } = await generateText({
         model: google(model),
         prompt,
-        maxTokens: 3000,
-        temperature: 0.1, // Very low temperature for consistent JSON
+        maxOutputTokens: 8192, // Increased token limit
+        temperature: 0.0, // Zero temperature for maximum consistency
+        topP: 0.1, // Very focused responses
       })
 
       if (!text || text.length < 100) {
         throw new Error("Response too short")
       }
 
-      console.log("Raw Gemini response:", text.substring(0, 500))
+      // Check if response appears complete
+      if (!text.includes('"modules"') || !text.includes('"title"')) {
+        throw new Error("Response missing required fields")
+      }
+
+      console.log(`Model ${model} response length:`, text.length)
+      console.log(`Model ${model} response preview:`, text.substring(0, 300))
       return text
     } catch (error) {
       console.error(`Model ${model} failed:`, error)
@@ -305,43 +333,14 @@ export async function POST(request: NextRequest) {
       console.log("No API key found, using fallback plan")
       planData = createFallbackPlan(userData)
     } else {
-      // Very simple and structured prompt to minimize JSON errors
-      const prompt = `Create a learning plan for: ${userData.learningGoal}
+      // Much simpler and more reliable prompt
+      const prompt = `Create a ${moduleCount}-module learning plan for "${userData.learningGoal}".
 
-Requirements:
-- ${moduleCount} modules total
-- Daily time: ${userData.dailyTime}
-- Duration: ${userData.duration}
-- Style: ${userData.learningStyle}
-- Level: ${userData.targetLevel}
+Output ONLY valid JSON (no markdown, no explanations):
 
-Return ONLY valid JSON with this exact structure (no markdown, no extra text):
+{"title":"${userData.learningGoal} - Öğrenme Planı","modules":[{"id":"1","title":"Giriş ve Temel Kavramlar","description":"Temel konulara giriş","objectives":["Temel kavramları öğrenmek"],"resources":["Ders materyali"],"quiz":{"question":"Bu modülde ne öğrendiniz?","type":"open"},"type":"lesson"},{"id":"2","title":"İkinci Modül","description":"İkinci aşama konuları","objectives":["İleri konuları öğrenmek"],"resources":["Pratik örnekler"],"quiz":{"question":"Bu modülde ne öğrendiniz?","type":"open"},"type":"lesson"}]}
 
-{
-  "title": "Learning Plan Title",
-  "modules": [
-    {
-      "id": "1",
-      "title": "Module Title",
-      "description": "Brief description",
-      "objectives": ["Objective 1", "Objective 2"],
-      "resources": ["Resource 1", "Resource 2"],
-      "quiz": {
-        "question": "Assessment question?",
-        "type": "open"
-      },
-      "type": "lesson"
-    }
-  ]
-}
-
-Rules:
-- Make every 3rd module type "quiz" 
-- Make the last module type "exam"
-- Include exactly ${moduleCount} modules
-- Use simple, clear titles and descriptions
-- Keep objectives and resources as short arrays
-- Ensure all JSON is properly formatted`
+Replace the content but keep the exact JSON structure. Create exactly ${moduleCount} modules. Make every 3rd module type "quiz" and the last one type "exam".`
 
       try {
         // Try Gemini first
