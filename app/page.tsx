@@ -169,6 +169,22 @@ export default function MicroLearningPlatform() {
     return match ? Number.parseInt(match[0]) : 0;
   };
 
+  // Modülleri doğru sıralamak için yeni fonksiyon
+  const sortModulesByOrder = (modules: Module[]) => {
+    return modules.sort((a, b) => {
+      // Önce unlocked durumuna göre sırala (unlocked olanlar üstte)
+      if (a.unlocked && !b.unlocked) return -1;
+      if (!a.unlocked && b.unlocked) return 1;
+      
+      // Sonra completed durumuna göre sırala (completed olanlar üstte)
+      if (a.completed && !b.completed) return -1;
+      if (!a.completed && b.completed) return 1;
+      
+      // Son olarak ID'ye göre sırala
+      return getNumericId(a.id) - getNumericId(b.id);
+    });
+  };
+
   const handleSignOut = async () => {
   try {
     // Önce localStorage'ı temizle
@@ -204,10 +220,15 @@ export default function MicroLearningPlatform() {
       const savedModules = localStorage.getItem("currentModules");
       if (savedModules) {
         const modules = JSON.parse(savedModules);
-        setLearningPlan((prev) => ({
-          ...prev,
-          modules: modules,
-        }));
+        // Modülleri doğru sırala
+        const sortedModules = sortModulesByOrder(modules);
+        setLearningPlan((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            modules: sortedModules,
+          };
+        });
         setCurrentScreen("dashboard");
         return;
       }
@@ -264,10 +285,8 @@ export default function MicroLearningPlatform() {
             })
           );
 
-          // Modülleri sırala ve kaydet
-          const sortedModules = modulesWithContent.sort(
-            (a: Module, b: Module) => getNumericId(a.id) - getNumericId(b.id)
-          );
+          // Modülleri doğru sırala ve kaydet
+          const sortedModules = sortModulesByOrder(modulesWithContent);
           localStorage.setItem("currentModules", JSON.stringify(sortedModules));
 
           setLearningPlan({
@@ -465,10 +484,8 @@ export default function MicroLearningPlatform() {
         })
       );
 
-      // Modülleri id'ye göre sırala
-      const sortedModules = modulesWithContent.sort(
-        (a: Module, b: Module) => getNumericId(a.id) - getNumericId(b.id)
-      );
+      // Modülleri doğru sırala
+      const sortedModules = sortModulesByOrder(modulesWithContent);
 
       // Local storage'a modül verilerini kaydet
       localStorage.setItem("currentModules", JSON.stringify(sortedModules));
@@ -618,14 +635,20 @@ export default function MicroLearningPlatform() {
             
             setCurrentModule(updatedModule);
             
-            // Learning plan'i de güncelle
+            // Learning plan'i de güncelle ve localStorage'a kaydet
             setLearningPlan(prevPlan => {
               if (!prevPlan) return prevPlan;
+              const updatedModules = prevPlan.modules.map(m => 
+                m.id === module.id ? updatedModule : m
+              );
+              
+              // Modülleri doğru sırala ve localStorage'a kaydet
+              const sortedModules = sortModulesByOrder(updatedModules);
+              localStorage.setItem("currentModules", JSON.stringify(sortedModules));
+              
               return {
                 ...prevPlan,
-                modules: prevPlan.modules.map(m => 
-                  m.id === module.id ? updatedModule : m
-                );
+                modules: sortedModules,
               };
             });
           } else {
@@ -747,7 +770,11 @@ export default function MicroLearningPlatform() {
         // Check if all modules are completed
         const allModulesCompleted = updatedModules.every((m) => m.completed);
 
-        setLearningPlan({ ...learningPlan, modules: updatedModules });
+        // Modülleri doğru sırala ve localStorage'a kaydet
+        const sortedModules = sortModulesByOrder(updatedModules);
+        localStorage.setItem("currentModules", JSON.stringify(sortedModules));
+
+        setLearningPlan({ ...learningPlan, modules: sortedModules });
         setCurrentScreen("dashboard");
         setCurrentModule(null);
         setFeedback("");
@@ -1725,7 +1752,6 @@ export default function MicroLearningPlatform() {
 
             {/* Content Body */}
             <div className="p-8">
-<<<<<<< HEAD
               {(currentContent.type === "text" || currentContent.type === "video") && (
                 <div className="prose prose-slate max-w-none">
                   <p className="text-lg text-slate-700 leading-relaxed whitespace-pre-line">{currentContent.content}</p>
@@ -1757,8 +1783,6 @@ export default function MicroLearningPlatform() {
                       </div>
                     )) || <div className="text-slate-500">Video önerisi bulunmuyor</div>}
                   </div>
-                </div>
-              )}
                 </div>
               )}
 
