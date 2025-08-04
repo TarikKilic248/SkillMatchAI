@@ -2,7 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter, Poppins } from "next/font/google"
 import "./globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
+import { ClientThemeProvider } from "@/components/client-theme-provider"
 import { AuthProvider } from "@/lib/auth-context"
 
 // If loading a variable font, you don't need to specify the font weight
@@ -33,9 +33,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${poppins.variable}`}>
       <body>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <ClientThemeProvider>
           <AuthProvider>{children}</AuthProvider>
-        </ThemeProvider>
+        </ClientThemeProvider>
       </body>
     </html>
   )

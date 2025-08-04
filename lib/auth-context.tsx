@@ -36,11 +36,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        return data.user
+      if (!response.ok) {
+        console.error('User fetch failed:', response.status, response.statusText);
+        return null;
       }
-      return null
+
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        console.error("User response is not JSON:", contentType);
+        return null;
+      }
+
+      try {
+        const data = await response.json();
+        return data.user;
+      } catch (jsonError) {
+        console.error("User JSON parse error:", jsonError);
+        return null;
+      }
     } catch (error) {
       console.error('Error fetching user:', error)
       return null
@@ -81,15 +95,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ email, password })
       })
 
-      const data = await response.json()
+      if (!response.ok) {
+        console.error('Signin failed:', response.status, response.statusText);
+        return { success: false, error: 'Giriş başarısız' };
+      }
 
-      if (response.ok && data.session?.access_token) {
-        // Token'ı kaydet
-        localStorage.setItem('access_token', data.session.access_token)
-        setUser(data.user)
-        return { success: true }
-      } else {
-        return { success: false, error: data.error || 'Giriş başarısız' }
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        console.error("Signin response is not JSON:", contentType);
+        return { success: false, error: 'Sunucu hatası' };
+      }
+
+      try {
+        const data = await response.json();
+
+        if (data.session?.access_token) {
+          // Token'ı kaydet
+          localStorage.setItem('access_token', data.session.access_token)
+          setUser(data.user)
+          return { success: true }
+        } else {
+          return { success: false, error: data.error || 'Giriş başarısız' }
+        }
+      } catch (jsonError) {
+        console.error("Signin JSON parse error:", jsonError);
+        return { success: false, error: 'Sunucu hatası' };
       }
     } catch (error) {
       console.error('Sign in error:', error)
@@ -107,13 +138,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ email, password, full_name: fullName })
       })
 
-      const data = await response.json()
+      if (!response.ok) {
+        console.error('Signup failed:', response.status, response.statusText);
+        return { success: false, error: 'Kayıt başarısız' };
+      }
 
-      if (response.ok) {
-        // Kayıt başarılı, giriş yap
-        return await signIn(email, password)
-      } else {
-        return { success: false, error: data.error || 'Kayıt başarısız' }
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        console.error("Signup response is not JSON:", contentType);
+        return { success: false, error: 'Sunucu hatası' };
+      }
+
+      try {
+        const data = await response.json();
+
+        if (data.message) {
+          // Kayıt başarılı, giriş yap
+          return await signIn(email, password)
+        } else {
+          return { success: false, error: data.error || 'Kayıt başarısız' }
+        }
+      } catch (jsonError) {
+        console.error("Signup JSON parse error:", jsonError);
+        return { success: false, error: 'Sunucu hatası' };
       }
     } catch (error) {
       console.error('Sign up error:', error)
