@@ -209,6 +209,24 @@ CREATE POLICY "Users can view module contents for their modules" ON module_conte
         )
     );
 
+CREATE POLICY "Users can insert module contents for their modules" ON module_contents
+    FOR INSERT WITH CHECK (
+        module_id IN (
+            SELECT m.id FROM modules m
+            JOIN learning_plans lp ON m.plan_id = lp.id
+            WHERE lp.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can update module contents for their modules" ON module_contents
+    FOR UPDATE USING (
+        module_id IN (
+            SELECT m.id FROM modules m
+            JOIN learning_plans lp ON m.plan_id = lp.id
+            WHERE lp.user_id = auth.uid()
+        )
+    );
+
 CREATE POLICY "Users can manage their own progress" ON student_progress
     FOR ALL USING (auth.uid() = user_id);
 
