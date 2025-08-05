@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@ai-sdk/google": "latest",
+    "@google/generative-ai": "^0.24.1",
     "@radix-ui/react-accordion": "latest",
     "@radix-ui/react-alert-dialog": "latest",
     "@radix-ui/react-aspect-ratio": "latest",
