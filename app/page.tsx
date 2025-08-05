@@ -102,6 +102,7 @@ interface LearningPlan {
 
 export default function MicroLearningPlatform() {
   const { user, signOut, loading: authLoading } = useAuth();
+  const [mounted, setMounted] = useState(false); // Hydration kontrolü için
   const [currentScreen, setCurrentScreen] = useState<
     | "welcome"
     | "questions"
@@ -150,9 +151,14 @@ export default function MicroLearningPlatform() {
   const [hasAttemptedPlanLoad, setHasAttemptedPlanLoad] = useState(false); // Plan yükleme denemesi yapıldı mı?
   const router = useRouter();
 
+  // Hydration tamamlandığında mount durumunu set et
   useEffect(() => {
-    if (!authLoading) {
-      // Sadece kimlik doğrulama durumu bilindiğinde devam et
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!authLoading && mounted) {
+      // Sadece kimlik doğrulama durumu bilindiğinde ve component mount olduğunda devam et
       if (user) {
         // Kullanıcı giriş yapmış, planı yüklemeye çalış
         loadUserPlans();
@@ -162,7 +168,44 @@ export default function MicroLearningPlatform() {
         setHasAttemptedPlanLoad(true); // Giriş yapmamış kullanıcı için kontrol tamamlandı
       }
     }
-  }, [user, authLoading]); // user ve authLoading değiştiğinde tetikle
+  }, [user, authLoading, mounted]); // mounted da dependency'e eklendi
+
+  // Hydration sorununu önlemek için ayrı bir useEffect
+  useEffect(() => {
+    // Client-side'da çalıştığımızdan ve component mount olduğundan emin olmak için
+    if (typeof window !== 'undefined' && mounted) {
+      const token = localStorage.getItem("access_token");
+      const savedModules = localStorage.getItem("currentModules");
+      
+      // Eğer token ve modüller varsa, doğrudan dashboard'a git
+      if (token && savedModules && !authLoading && user) {
+        try {
+          const modules = JSON.parse(savedModules);
+          const sortedModules = sortModulesByOrder(modules);
+          setLearningPlan((prev) => {
+            if (!prev) {
+              return {
+                id: 'default-plan',
+                title: 'Öğrenme Planınız',
+                description: 'Kişiselleştirilmiş öğrenme planınız',
+                modules: sortedModules,
+                created_at: new Date().toISOString()
+              };
+            }
+            return {
+              ...prev,
+              modules: sortedModules,
+            };
+          });
+          setCurrentScreen("dashboard");
+        } catch (error) {
+          console.error('Local storage modül verisi parse edilemedi:', error);
+          // Hatalı veri varsa temizle
+          localStorage.removeItem("currentModules");
+        }
+      }
+    }
+  }, [user, authLoading, mounted]); // mounted da dependency'e eklendi
 
   const getNumericId = (id: string) => {
     const match = id.match(/\d+/);
@@ -216,23 +259,7 @@ export default function MicroLearningPlatform() {
         return;
       }
 
-      // Önce local storage'dan mevcut modülleri kontrol et
-      const savedModules = localStorage.getItem("currentModules");
-      if (savedModules) {
-        const modules = JSON.parse(savedModules);
-        // Modülleri doğru sırala
-        const sortedModules = sortModulesByOrder(modules);
-        setLearningPlan((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            modules: sortedModules,
-          };
-        });
-        setCurrentScreen("dashboard");
-        return;
-      }
-
+      // API'den planları getir
       const response = await fetch("/api/get-user-plans", {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -945,8 +972,8 @@ export default function MicroLearningPlatform() {
     }
   }
 
-  // Genel yükleme ekranı
-  if (currentScreen === "loading" && !hasAttemptedPlanLoad) {
+  // Genel yükleme ekranı - auth loading, mount olmamış veya plan yükleme durumunda
+  if (!mounted || authLoading || (currentScreen === "loading" && !hasAttemptedPlanLoad)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600 flex items-center justify-center p-4">
         <Card className="w-full max-w-md bg-white/10 backdrop-blur-xl border-white/20 text-white shadow-2xl">
