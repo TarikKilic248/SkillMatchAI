@@ -112,7 +112,7 @@ export default function MicroLearningPlatform() {
     | "module-content"
     | "module-test"
     | "module-complete"
-  >("loading"); // Başlangıçta genel bir yükleme durumu
+  >("welcome"); // Başlangıçta genel bir yükleme durumu
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [userData, setUserData] = useState<UserData>({
     learningGoal: "",
